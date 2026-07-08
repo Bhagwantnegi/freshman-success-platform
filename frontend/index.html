@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Freshman Success Intelligence Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2333;
+    --border: #30363d;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --high: #f85149;
+    --high-dim: rgba(248,81,73,0.15);
+    --med: #f0883e;
+    --med-dim: rgba(240,136,62,0.15);
+    --low: #3fb950;
+    --low-dim: rgba(63,185,80,0.15);
+    --accent: #58a6ff;
+    --accent-dim: rgba(88,166,255,0.12);
+    --gold: #d4a72c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
+
+  /* HEADER */
+  .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .header-left { display: flex; align-items: center; gap: 14px; }
+  .header-logo { width: 36px; height: 36px; background: var(--accent-dim); border: 1px solid var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .header-title { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+  .header-sub { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  .header-badge { background: var(--high-dim); border: 1px solid var(--high); color: var(--high); padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 5px; }
+  .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--high); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.3)} }
+
+  /* NAV */
+  .nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 28px; display: flex; gap: 0; }
+  .nav-tab { padding: 12px 18px; cursor: pointer; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; transition: all 0.15s; white-space: nowrap; }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* LAYOUT */
+  .main { padding: 24px 28px; max-width: 1600px; margin: 0 auto; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* KPI STRIP */
+  .kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 24px; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; position: relative; overflow: hidden; }
+  .kpi::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+  .kpi.red::before { background: var(--high); }
+  .kpi.orange::before { background: var(--med); }
+  .kpi.blue::before { background: var(--accent); }
+  .kpi.green::before { background: var(--low); }
+  .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 8px; }
+  .kpi-value { font-size: 32px; font-weight: 700; line-height: 1; }
+  .kpi-value.red { color: var(--high); }
+  .kpi-value.orange { color: var(--med); }
+  .kpi-value.blue { color: var(--accent); }
+  .kpi-value.green { color: var(--low); }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  /* GRID */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-65-35 { display: grid; grid-template-columns: 1.8fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-35-65 { display: grid; grid-template-columns: 1fr 1.8fr; gap: 16px; margin-bottom: 16px; }
+
+  /* CARD */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .card-subtitle { font-size: 11px; color: var(--muted); margin-bottom: 16px; }
+  .chart-wrap { position: relative; }
+
+  /* CONTACT LIST */
+  .contact-table { width: 100%; border-collapse: collapse; }
+  .contact-table th { text-align: left; padding: 8px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .contact-table td { padding: 9px 10px; border-bottom: 1px solid rgba(48,54,61,0.5); vertical-align: middle; }
+  .contact-table tr:last-child td { border-bottom: none; }
+  .contact-table tr:hover td { background: var(--surface2); }
+  .risk-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+  .risk-badge.high { background: var(--high-dim); color: var(--high); border: 1px solid var(--high); }
+  .risk-badge.med { background: var(--med-dim); color: var(--med); border: 1px solid var(--med); }
+  .risk-badge.low { background: var(--low-dim); color: var(--low); border: 1px solid var(--low); }
+  .fsi-bar { display: flex; align-items: center; gap: 8px; }
+  .fsi-bar-track { flex: 1; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; max-width: 80px; }
+  .fsi-bar-fill { height: 100%; border-radius: 3px; }
+  .sparkline-cell { display: inline-block; vertical-align: middle; }
+  .trend-chip { font-size: 10px; padding: 2px 6px; border-radius: 4px; }
+  .trend-chip.down { background: var(--high-dim); color: var(--high); }
+  .trend-chip.up { background: var(--low-dim); color: var(--low); }
+  .trend-chip.flat { background: var(--accent-dim); color: var(--accent); }
+
+  /* SEARCH & FILTER */
+  .filter-bar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+  .search-input { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 7px 12px; border-radius: 6px; font-size: 13px; width: 220px; outline: none; }
+  .search-input:focus { border-color: var(--accent); }
+  .filter-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--muted); padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+  .filter-btn:hover, .filter-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+  .filter-btn.high-active { border-color: var(--high); color: var(--high); background: var(--high-dim); }
+  .filter-btn.med-active { border-color: var(--med); color: var(--med); background: var(--med-dim); }
+  .filter-btn.low-active { border-color: var(--low); color: var(--low); background: var(--low-dim); }
+  .result-count { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+  /* GAUGE */
+  .gauge-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .gauge-number { font-size: 42px; font-weight: 800; }
+  .gauge-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* HEATMAP */
+  .heatmap-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 3px; }
+  .hm-cell { height: 32px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; cursor: pointer; transition: transform 0.1s; }
+  .hm-cell:hover { transform: scale(1.15); z-index: 2; }
+  .hm-header { font-size: 10px; color: var(--muted); text-align: center; padding: 4px 0; }
+
+  /* SCATTER */
+  .scatter-container { position: relative; }
+
+  /* INSIGHT BOX */
+  .insight { background: var(--surface2); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; padding: 10px 14px; margin-bottom: 10px; font-size: 12px; line-height: 1.6; }
+  .insight.warn { border-left-color: var(--high); }
+  .insight strong { color: var(--text); }
+
+  /* METRIC ROW */
+  .metric-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(48,54,61,0.4); font-size: 13px; }
+  .metric-row:last-child { border-bottom: none; }
+  .metric-label { color: var(--muted); }
+  .metric-value { font-weight: 600; }
+
+  /* PROFILE PANEL */
+  .profile-panel { display: none; position: fixed; right: 0; top: 0; bottom: 0; width: 380px; background: var(--surface); border-left: 1px solid var(--border); z-index: 200; overflow-y: auto; transform: translateX(100%); transition: transform 0.25s; }
+  .profile-panel.open { transform: translateX(0); display: block; }
+  .profile-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .profile-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+  .profile-body { padding: 20px; }
+  .profile-id { font-size: 28px; font-weight: 800; }
+  .profile-risk { margin-top: 6px; }
+  .profile-section { margin-top: 20px; }
+  .profile-section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin-bottom: 10px; }
+  .profile-stat { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(48,54,61,0.3); }
+  .profile-stat:last-child { border-bottom: none; }
+  .profile-stat-label { font-size: 12px; color: var(--muted); }
+  .profile-stat-value { font-size: 13px; font-weight: 600; }
+  .action-btn { display: block; width: 100%; padding: 11px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; margin-bottom: 8px; border: none; }
+  .action-primary { background: var(--high); color: white; }
+  .action-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 199; }
+  .overlay.open { display: block; }
+
+  /* MINI CHART */
+  .mini-bar { display: inline-flex; align-items: flex-end; gap: 1px; height: 20px; }
+  .mini-bar span { width: 4px; border-radius: 1px; }
+
+  /* PERCENTILE BAR */
+  .perc-bar { margin-bottom: 10px; }
+  .perc-label-row { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .perc-track { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .perc-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+
+  /* TABLE SCROLL */
+  .table-scroll { overflow-x: auto; }
+  .table-scroll::-webkit-scrollbar { height: 4px; }
+  .table-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* LEGEND */
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* TOOLTIP */
+  .tooltip { position: absolute; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 12px; pointer-events: none; z-index: 50; white-space: nowrap; display: none; }
+
+  /* SCATTER CANVAS */
+  #scatterCanvas { cursor: crosshair; }
+
+  /* Sticky table header */
+  .contact-table thead { position: sticky; top: 0; background: var(--surface); z-index: 5; }
+
+  .page-section-title { font-size: 15px; font-weight: 700; margin-bottom: 14px; margin-top: 4px; color: var(--text); }
+
+  @media (max-width: 1100px) {
+    .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+    .grid-2, .grid-3, .grid-65-35, .grid-35-65 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-logo">🎓</div>
+    <div>
+      <div class="header-title">Freshman Success Intelligence</div>
+      <div class="header-sub">Week 8 · Fall Semester · 200 Students Enrolled</div>
+    </div>
+  </div>
+  <div class="header-badge"><span class="pulse"></span>67 Students Need Contact</div>
+</div>
+
+<nav class="nav">
+  <div class="nav-tab active" onclick="switchPage('overview',this)">Overview</div>
+  <div class="nav-tab" onclick="switchPage('contact',this)">Contact List</div>
+  <div class="nav-tab" onclick="switchPage('trends',this)">Trends</div>
+  <div class="nav-tab" onclick="switchPage('analytics',this)">Analytics</div>
+</nav>
+
+<div class="main">
+
+  <!-- OVERVIEW PAGE -->
+  <div class="page active" id="page-overview">
+    <div class="kpi-strip">
+      <div class="kpi red">
+        <div class="kpi-label">High Risk Students</div>
+        <div class="kpi-value red">67</div>
+        <div class="kpi-sub">33.5% of cohort · Contact immediately</div>
+      </div>
+      <div class="kpi orange">
+        <div class="kpi-label">Retention Rate</div>
+        <div class="kpi-value orange">61.5%</div>
+        <div class="kpi-sub">Historical baseline · Target: 75%</div>
+      </div>
+      <div class="kpi blue">
+        <div class="kpi-label">Avg. Midterm GPA</div>
+        <div class="kpi-value blue">2.13</div>
+        <div class="kpi-sub">Class average · Min passing: 2.0</div>
+      </div>
+      <div class="kpi green">
+        <div class="kpi-label">Low Risk Students</div>
+        <div class="kpi-value green">71</div>
+        <div class="kpi-sub">35.5% on track · Continue monitoring</div>
+      </div>
+    </div>
+
+    <div class="grid-65-35">
+      <div class="card">
+        <div class="card-title">Freshman Success Index — Cohort Distribution (Week 8)</div>
+        <div class="card-subtitle">Each bar = 5-point FSI bucket. Click a bar to filter the Contact List.</div>
+        <div class="chart-wrap"><canvas id="histChart" height="200"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Risk Category Breakdown</div>
+        <div class="card-subtitle">200 students as of Week 8</div>
+        <div class="chart-wrap" style="display:flex;align-items:center;justify-content:center;padding:10px 0;">
+          <canvas id="donutChart" height="220" style="max-width:220px;"></canvas>
+        </div>
+        <div class="legend" style="justify-content:center;">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--high)"></div>High Risk (67)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--med)"></div>Medium Risk (62)</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--low)"></div>Low Risk (71)</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-title">GPA vs. Retention Rate</div>
+        <div class="card-subtitle">Students who were retained vs. dropped by GPA bucket</div>
+        <div class="chart-wrap"><canvas id="gpaRetentionChart" height="200"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Stress Score Distribution</div>
+        <div class="card-subtitle">By risk category (Week 8)</div>
+        <div class="chart-wrap"><canvas id="stressChart" height="200"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Top Predictors of Dropout</div>
+        <div class="card-subtitle">Correlation with non-retention (Week 8)</div>
+        <div class="chart-wrap"><canvas id="predictorChart" height="200"></canvas></div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Key Insights</div>
+        <div class="card-subtitle">Data-driven observations from Week 8</div>
+        <div class="insight warn"><strong>🚨 Immediate Action:</strong> 67 students are classified High Risk with avg FSI of 51.6. Top 10 critical students have FSI below 48 — reach out within 24 hours.</div>
+        <div class="insight warn"><strong>⚠️ GPA Alert:</strong> Midterm GPA is the strongest dropout predictor (r = 0.71). Students with GPA below 1.5 have a <strong>82% dropout rate</strong>.</div>
+        <div class="insight"><strong>📈 Stress Signal:</strong> High-risk students average stress score 6.6 vs 3.8 for Low Risk. Stress-reduction interventions may improve retention.</div>
+        <div class="insight"><strong>🤝 Belonging Gap:</strong> Belonging score shows moderate correlation with retention. Students with score ≤ 3 need community connection support.</div>
+        <div class="insight"><strong>📚 Tutoring Insight:</strong> High-risk students who visited tutoring 3+ times show 28% higher retention than those with 0 visits.</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Cohort Health Summary</div>
+        <div class="card-subtitle">Week 8 aggregate metrics</div>
+        <div class="metric-row"><span class="metric-label">Total Enrolled</span><span class="metric-value">200</span></div>
+        <div class="metric-row"><span class="metric-label">Avg. Freshman Success Index</span><span class="metric-value" style="color:var(--accent)">61.4</span></div>
+        <div class="metric-row"><span class="metric-label">Avg. Attendance Rate</span><span class="metric-value">78.3%</span></div>
+        <div class="metric-row"><span class="metric-label">Avg. Assignment Completion</span><span class="metric-value">76.2%</span></div>
+        <div class="metric-row"><span class="metric-label">Avg. Study Hours / Week</span><span class="metric-value">10.3 hrs</span></div>
+        <div class="metric-row"><span class="metric-label">Avg. LMS Logins / Week</span><span class="metric-value">14.7</span></div>
+        <div class="metric-row"><span class="metric-label">Avg. Stress Score (1-10)</span><span class="metric-value" style="color:var(--med)">5.5</span></div>
+        <div class="metric-row"><span class="metric-label">Avg. Belonging Score (1-10)</span><span class="metric-value">5.4</span></div>
+        <div class="metric-row"><span class="metric-label">Students w/ 0 Tutoring Visits</span><span class="metric-value" style="color:var(--high)">47</span></div>
+        <div class="metric-row"><span class="metric-label">Students w/ Attendance &lt;65%</span><span class="metric-value" style="color:var(--high)">24</span></div>
+        <div class="metric-row"><span class="metric-label">Retained Next Semester</span><span class="metric-value" style="color:var(--low)">123 / 200</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTACT LIST PAGE -->
+  <div class="page" id="page-contact">
+    <div class="page-section-title">Priority Contact List</div>
+    <div class="filter-bar">
+      <input class="search-input" id="searchInput" placeholder="🔍  Search by Student ID..." oninput="applyFilters()">
+      <button class="filter-btn high-active" id="btn-high" onclick="toggleFilter('High Risk',this)">🔴 High Risk (67)</button>
+      <button class="filter-btn med-active" id="btn-med" onclick="toggleFilter('Medium Risk',this)">🟠 Medium Risk (62)</button>
+      <button class="filter-btn low-active" id="btn-low" onclick="toggleFilter('Low Risk',this)">🟢 Low Risk (71)</button>
+      <div class="result-count" id="result-count">Showing 200 students</div>
+    </div>
+    <div class="card" style="padding:0;">
+      <div class="table-scroll" style="max-height:65vh;overflow-y:auto;">
+        <table class="contact-table" id="contactTable">
+          <thead>
+            <tr>
+              <th onclick="sortTable('student_id')" style="cursor:pointer">Student ID ↕</th>
+              <th onclick="sortTable('risk_category')" style="cursor:pointer">Risk ↕</th>
+              <th onclick="sortTable('freshman_success_index')" style="cursor:pointer">FSI ↕</th>
+              <th onclick="sortTable('midterm_gpa')" style="cursor:pointer">GPA ↕</th>
+              <th onclick="sortTable('attendance_pct')" style="cursor:pointer">Attend. ↕</th>
+              <th onclick="sortTable('stress_score')" style="cursor:pointer">Stress ↕</th>
+              <th onclick="sortTable('belonging_score')" style="cursor:pointer">Belong. ↕</th>
+              <th>8-Week Trend</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="contactTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRENDS PAGE -->
+  <div class="page" id="page-trends">
+    <div class="page-section-title">Weekly Trend Analysis (Weeks 1–8)</div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Average Freshman Success Index Over Time</div>
+        <div class="card-subtitle">Cohort-wide weekly average FSI</div>
+        <div class="chart-wrap"><canvas id="fsiTrendChart" height="220"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">High-Risk Student Count Per Week</div>
+        <div class="card-subtitle">Number of students classified High Risk each week</div>
+        <div class="chart-wrap"><canvas id="highRiskTrendChart" height="220"></canvas></div>
+      </div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Avg. Midterm GPA Trajectory</div>
+        <div class="card-subtitle">Weekly average GPA across cohort</div>
+        <div class="chart-wrap"><canvas id="gpaTrendChart" height="220"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Stress vs. Belonging Over Time</div>
+        <div class="card-subtitle">Opposing wellbeing indicators week by week</div>
+        <div class="chart-wrap"><canvas id="wellbeingChart" height="220"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Most Rapidly Declining Students — FSI Drop from Week 1→8</div>
+      <div class="card-subtitle">Top 15 students with largest FSI decline over the semester. These are candidates for immediate intervention.</div>
+      <div class="chart-wrap"><canvas id="declineChart" height="180"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ANALYTICS PAGE -->
+  <div class="page" id="page-analytics">
+    <div class="page-section-title">Deep Analytics</div>
+    <div class="grid-65-35">
+      <div class="card">
+        <div class="card-title">FSI vs. Midterm GPA Scatter — All Students</div>
+        <div class="card-subtitle">Click any dot to view student profile. Color = risk category.</div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--high)"></div>High Risk</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--med)"></div>Medium Risk</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--low)"></div>Low Risk</div>
+        </div>
+        <div class="chart-wrap scatter-container"><canvas id="scatterChart" height="300"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Attendance vs. Retention</div>
+        <div class="card-subtitle">Avg attendance in buckets vs. retention rate</div>
+        <div class="chart-wrap"><canvas id="attendRetChart" height="200"></canvas></div>
+        <div style="margin-top:16px;">
+          <div class="card-title">Support Usage by Risk Group</div>
+          <div class="card-subtitle">Avg tutoring & office hour visits</div>
+          <div class="chart-wrap" style="margin-top:8px;"><canvas id="supportChart" height="160"></canvas></div>
+        </div>
+      </div>
+    </div>
+    <div class="grid-3">
+      <div class="card">
+        <div class="card-title">LMS Login Activity</div>
+        <div class="card-subtitle">Avg logins/week by risk group</div>
+        <div class="chart-wrap"><canvas id="lmsChart" height="200"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Study Hours Distribution</div>
+        <div class="card-subtitle">Weekly study hours by risk category</div>
+        <div class="chart-wrap"><canvas id="studyChart" height="200"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Assignments Completed</div>
+        <div class="card-subtitle">Completion rate % by risk group</div>
+        <div class="chart-wrap"><canvas id="assignChart" height="200"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end main -->
+
+<!-- STUDENT PROFILE PANEL -->
+<div class="overlay" id="overlay" onclick="closeProfile()"></div>
+<div class="profile-panel" id="profilePanel">
+  <div class="profile-header">
+    <div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;">Student Profile</div>
+      <div class="profile-id" id="p-id">—</div>
+    </div>
+    <button class="profile-close" onclick="closeProfile()">✕</button>
+  </div>
+  <div class="profile-body">
+    <div class="profile-risk" id="p-risk-badge"></div>
+    <div class="profile-section">
+      <div class="profile-section-title">Academic Metrics</div>
+      <div class="profile-stat"><span class="profile-stat-label">Freshman Success Index</span><span class="profile-stat-value" id="p-fsi"></span></div>
+      <div class="profile-stat"><span class="profile-stat-label">Midterm GPA</span><span class="profile-stat-value" id="p-gpa"></span></div>
+      <div class="profile-stat"><span class="profile-stat-label">Attendance Rate</span><span class="profile-stat-value" id="p-attend"></span></div>
+      <div class="profile-stat"><span class="profile-stat-label">Assignments Completed</span><span class="profile-stat-value" id="p-assign"></span></div>
+      <div class="profile-stat"><span class="profile-stat-label">Weekly Study Hours</span><span class="profile-stat-value" id="p-study"></span></div>
+      <div class="profile-stat"><span class="profile-stat-label">LMS Logins</span><span class="profile-stat-value" id="p-lms"></span></div>
+    </div>
+    <div class="profile-section">
+      <div class="profile-section-title">Wellbeing & Engagement</div>
+      <div class="profile-stat"><span class="profile-stat-label">Stress Score (1=low)</span><span class="profile-stat-value" id="p-stress"></span></div>
+      <div class="profile-stat"><span class="profile-stat-label">Belonging Score</span><span class="profile-stat-value" id="p-belong"></span></div>
+      <div class="profile-stat"><span class="profile-stat-label">Tutoring Visits</span><span class="profile-stat-value" id="p-tutor"></span></div>
+      <div class="profile-stat"><span class="profile-stat-label">Office Hour Visits</span><span class="profile-stat-value" id="p-office"></span></div>
+    </div>
+    <div class="profile-section">
+      <div class="profile-section-title">FSI Trend (8 Weeks)</div>
+      <canvas id="profileTrendChart" height="100"></canvas>
+    </div>
+    <div class="profile-section">
+      <div class="profile-section-title">Percentile Rankings</div>
+      <div id="p-percentiles"></div>
+    </div>
+    <div class="profile-section">
+      <div class="profile-section-title">Recommended Actions</div>
+      <div id="p-actions"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== DATA =====================
+const DATA = {"weekly":[{"week":1,"avg_fsi":61.697,"avg_gpa":2.196,"avg_attendance":0.794,"high_risk_count":58,"avg_stress":5.09,"avg_belonging":5.425},{"week":2,"avg_fsi":60.776,"avg_gpa":2.144,"avg_attendance":0.772,"high_risk_count":69,"avg_stress":5.3,"avg_belonging":5.525},{"week":3,"avg_fsi":61.347,"avg_gpa":2.162,"avg_attendance":0.782,"high_risk_count":68,"avg_stress":5.415,"avg_belonging":5.585},{"week":4,"avg_fsi":61.231,"avg_gpa":2.116,"avg_attendance":0.761,"high_risk_count":75,"avg_stress":5.295,"avg_belonging":5.465},{"week":5,"avg_fsi":61.353,"avg_gpa":2.202,"avg_attendance":0.772,"high_risk_count":65,"avg_stress":5.4,"avg_belonging":5.39},{"week":6,"avg_fsi":61.277,"avg_gpa":2.144,"avg_attendance":0.778,"high_risk_count":67,"avg_stress":5.425,"avg_belonging":5.155},{"week":7,"avg_fsi":60.899,"avg_gpa":2.123,"avg_attendance":0.78,"high_risk_count":65,"avg_stress":5.015,"avg_belonging":5.66},{"week":8,"avg_fsi":61.389,"avg_gpa":2.127,"avg_attendance":0.783,"high_risk_count":67,"avg_stress":5.475,"avg_belonging":5.35}],"students_w8":[{"student_id":1,"risk_category":"High Risk","freshman_success_index":41.179,"midterm_gpa":2.4,"attendance_pct":0.65,"assignments_completed_pct":1.0,"stress_score":10,"belonging_score":7,"study_hours":17,"tutoring_visits":1,"office_hour_visits":0,"lms_logins":8,"retained_next_semester":0},{"student_id":2,"risk_category":"Medium Risk","freshman_success_index":59.26,"midterm_gpa":0.828,"attendance_pct":0.77,"assignments_completed_pct":0.86,"stress_score":6,"belonging_score":7,"study_hours":1,"tutoring_visits":3,"office_hour_visits":2,"lms_logins":1,"retained_next_semester":0},{"student_id":3,"risk_category":"Low Risk","freshman_success_index":66.002,"midterm_gpa":1.865,"attendance_pct":0.76,"assignments_completed_pct":0.71,"stress_score":2,"belonging_score":5,"study_hours":14,"tutoring_visits":0,"office_hour_visits":3,"lms_logins":6,"retained_next_semester":1},{"student_id":4,"risk_category":"Low Risk","freshman_success_index":75.476,"midterm_gpa":2.645,"attendance_pct":0.84,"assignments_completed_pct":0.96,"stress_score":3,"belonging_score":1,"study_hours":3,"tutoring_visits":2,"office_hour_visits":3,"lms_logins":23,"retained_next_semester":1},{"student_id":5,"risk_category":"Medium Risk","freshman_success_index":64.874,"midterm_gpa":2.551,"attendance_pct":0.99,"assignments_completed_pct":0.6,"stress_score":5,"belonging_score":9,"study_hours":4,"tutoring_visits":2,"office_hour_visits":0,"lms_logins":25,"retained_next_semester":1},{"student_id":6,"risk_category":"Low Risk","freshman_success_index":70.507,"midterm_gpa":2.574,"attendance_pct":0.99,"assignments_completed_pct":0.62,"stress_score":7,"belonging_score":1,"study_hours":18,"tutoring_visits":2,"office_hour_visits":0,"lms_logins":28,"retained_next_semester":1},{"student_id":7,"risk_category":"High Risk","freshman_success_index":49.0,"midterm_gpa":1.038,"attendance_pct":0.91,"assignments_completed_pct":0.59,"stress_score":3,"belonging_score":4,"study_hours":10,"tutoring_visits":0,"office_hour_visits":0,"lms_logins":19,"retained_next_semester":0},{"student_id":8,"risk_category":"High Risk","freshman_success_index":48.257,"midterm_gpa":1.433,"attendance_pct":0.8,"assignments_completed_pct":0.96,"stress_score":8,"belonging_score":1,"study_hours":15,"tutoring_visits":2,"office_hour_visits":0,"lms_logins":24,"retained_next_semester":0},{"student_id":9,"risk_category":"Medium Risk","freshman_success_index":58.31,"midterm_gpa":1.761,"attendance_pct":0.56,"assignments_completed_pct":0.64,"stress_score":10,"belonging_score":6,"study_hours":11,"tutoring_visits":3,"office_hour_visits":2,"lms_logins":8,"retained_next_semester":0},{"student_id":10,"risk_category":"Medium Risk","freshman_success_index":62.188,"midterm_gpa":1.89,"attendance_pct":0.87,"assignments_completed_pct":0.86,"stress_score":10,"belonging_score":1,"study_hours":1,"tutoring_visits":4,"office_hour_visits":2,"lms_logins":4,"retained_next_semester":1},{"student_id":11,"risk_category":"High Risk","freshman_success_index":44.264,"midterm_gpa":1.735,"attendance_pct":0.8,"assignments_completed_pct":0.77,"stress_score":9,"belonging_score":1,"study_hours":18,"tutoring_visits":3,"office_hour_visits":1,"lms_logins":21,"retained_next_semester":0},{"student_id":12,"risk_category":"Medium Risk","freshman_success_index":59.795,"midterm_gpa":1.042,"attendance_pct":0.91,"assignments_completed_pct":0.87,"stress_score":6,"belonging_score":8,"study_hours":9,"tutoring_visits":0,"office_hour_visits":1,"lms_logins":2,"retained_next_semester":0},{"student_id":13,"risk_category":"Low Risk","freshman_success_index":73.586,"midterm_gpa":2.698,"attendance_pct":0.63,"assignments_completed_pct":0.89,"stress_score":7,"belonging_score":3,"study_hours":17,"tutoring_visits":2,"office_hour_visits":1,"lms_logins":1,"retained_next_semester":1},{"student_id":14,"risk_category":"Low Risk","freshman_success_index":77.995,"midterm_gpa":3.114,"attendance_pct":0.83,"assignments_completed_pct":0.93,"stress_score":4,"belonging_score":5,"study_hours":16,"tutoring_visits":0,"office_hour_visits":1,"lms_logins":24,"retained_next_semester":1},{"student_id":15,"risk_category":"Low Risk","freshman_success_index":66.51,"midterm_gpa":1.927,"attendance_pct":0.91,"assignments_completed_pct":0.97,"stress_score":3,"belonging_score":10,"study_hours":13,"tutoring_visits":2,"office_hour_visits":3,"lms_logins":28,"retained_next_semester":1},{"student_id":16,"risk_category":"Low Risk","freshman_success_index":72.614,"midterm_gpa":2.228,"attendance_pct":0.83,"assignments_completed_pct":0.53,"stress_score":2,"belonging_score":4,"study_hours":17,"tutoring_visits":2,"office_hour_visits":2,"lms_logins":3,"retained_next_semester":1},{"student_id":17,"risk_category":"Low Risk","freshman_success_index":74.719,"midterm_gpa":1.709,"attendance_pct":0.76,"assignments_completed_pct":0.88,"stress_score":2,"belonging_score":10,"study_hours":2,"tutoring_visits":3,"office_hour_visits":0,"lms_logins":6,"retained_next_semester":0},{"student_id":18,"risk_category":"Medium Risk","freshman_success_index":60.614,"midterm_gpa":2.645,"attendance_pct":0.99,"assignments_completed_pct":0.67,"stress_score":4,"belonging_score":7,"study_hours":8,"tutoring_visits":1,"office_hour_visits":3,"lms_logins":21,"retained_next_semester":1},{"student_id":19,"risk_category":"Low Risk","freshman_success_index":72.102,"midterm_gpa":2.532,"attendance_pct":0.62,"assignments_completed_pct":0.99,"stress_score":2,"belonging_score":1,"study_hours":1,"tutoring_visits":1,"office_hour_visits":2,"lms_logins":23,"retained_next_semester":1},{"student_id":20,"risk_category":"Low Risk","freshman_success_index":66.326,"midterm_gpa":2.054,"attendance_pct":0.77,"assignments_completed_pct":0.92,"stress_score":4,"belonging_score":5,"study_hours":16,"tutoring_visits":4,"office_hour_visits":1,"lms_logins":15,"retained_next_semester":1},{"student_id":21,"risk_category":"Medium Risk","freshman_success_index":61.314,"midterm_gpa":2.19,"attendance_pct":0.96,"assignments_completed_pct":0.88,"stress_score":10,"belonging_score":6,"study_hours":9,"tutoring_visits":1,"office_hour_visits":3,"lms_logins":17,"retained_next_semester":0},{"student_id":22,"risk_category":"High Risk","freshman_success_index":54.869,"midterm_gpa":1.789,"attendance_pct":0.55,"assignments_completed_pct":0.6,"stress_score":7,"belonging_score":6,"study_hours":3,"tutoring_visits":2,"office_hour_visits":1,"lms_logins":20,"retained_next_semester":0},{"student_id":23,"risk_category":"High Risk","freshman_success_index":50.914,"midterm_gpa":1.604,"attendance_pct":0.83,"assignments_completed_pct":0.85,"stress_score":7,"belonging_score":6,"study_hours":6,"tutoring_visits":4,"office_hour_visits":0,"lms_logins":7,"retained_next_semester":0},{"student_id":24,"risk_category":"Medium Risk","freshman_success_index":58.919,"midterm_gpa":1.721,"attendance_pct":0.82,"assignments_completed_pct":1.0,"stress_score":10,"belonging_score":6,"study_hours":11,"tutoring_visits":3,"office_hour_visits":0,"lms_logins":26,"retained_next_semester":0},{"student_id":25,"risk_category":"High Risk","freshman_success_index":46.764,"midterm_gpa":1.548,"attendance_pct":0.57,"assignments_completed_pct":0.5,"stress_score":10,"belonging_score":5,"study_hours":4,"tutoring_visits":2,"office_hour_visits":2,"lms_logins":8,"retained_next_semester":0},{"student_id":26,"risk_category":"High Risk","freshman_success_index":53.569,"midterm_gpa":1.349,"attendance_pct":0.64,"assignments_completed_pct":0.99,"stress_score":3,"belonging_score":5,"study_hours":3,"tutoring_visits":2,"office_hour_visits":1,"lms_logins":13,"retained_next_semester":0},{"student_id":27,"risk_category":"Low Risk","freshman_success_index":79.14,"midterm_gpa":2.811,"attendance_pct":0.87,"assignments_completed_pct":0.66,"stress_score":1,"belonging_score":1,"study_hours":2,"tutoring_visits":1,"office_hour_visits":1,"lms_logins":28,"retained_next_semester":1},{"student_id":28,"risk_category":"Low Risk","freshman_success_index":69.098,"midterm_gpa":3.271,"attendance_pct":0.58,"assignments_completed_pct":0.79,"stress_score":1,"belonging_score":7,"study_hours":6,"tutoring_visits":4,"office_hour_visits":0,"lms_logins":14,"retained_next_semester":1},{"student_id":29,"risk_category":"Low Risk","freshman_success_index":66.61,"midterm_gpa":2.114,"attendance_pct":0.87,"assignments_completed_pct":0.55,"stress_score":3,"belonging_score":3,"study_hours":2,"tutoring_visits":2,"office_hour_visits":3,"lms_logins":24,"retained_next_semester":0},{"student_id":30,"risk_category":"High Risk","freshman_success_index":52.836,"midterm_gpa":1.077,"attendance_pct":0.76,"assignments_completed_pct":0.61,"stress_score":7,"belonging_score":9,"study_hours":13,"tutoring_visits":0,"office_hour_visits":3,"lms_logins":3,"retained_next_semester":0},{"student_id":31,"risk_category":"High Risk","freshman_success_index":54.807,"midterm_gpa":2.711,"attendance_pct":0.83,"assignments_completed_pct":0.9,"stress_score":6,"belonging_score":9,"study_hours":10,"tutoring_visits":0,"office_hour_visits":2,"lms_logins":2,"retained_next_semester":1},{"student_id":32,"risk_category":"Medium Risk","freshman_success_index":62.964,"midterm_gpa":2.993,"attendance_pct":0.84,"assignments_completed_pct":0.91,"stress_score":7,"belonging_score":6,"study_hours":5,"tutoring_visits":3,"office_hour_visits":1,"lms_logins":26,"retained_next_semester":1},{"student_id":33,"risk_category":"Medium Risk","freshman_success_index":65.219,"midterm_gpa":0.95,"attendance_pct":0.58,"assignments_completed_pct":0.56,"stress_score":1,"belonging_score":1,"study_hours":13,"tutoring_visits":0,"office_hour_visits":3,"lms_logins":3,"retained_next_semester":0},{"student_id":34,"risk_category":"Medium Risk","freshman_success_index":62.914,"midterm_gpa":1.258,"attendance_pct":0.77,"assignments_completed_pct":0.81,"stress_score":4,"belonging_score":2,"study_hours":10,"tutoring_visits":1,"office_hour_visits":3,"lms_logins":10,"retained_next_semester":0},{"student_id":35,"risk_category":"High Risk","freshman_success_index":56.552,"midterm_gpa":2.945,"attendance_pct":0.67,"assignments_completed_pct":0.67,"stress_score":6,"belonging_score":6,"study_hours":5,"tutoring_visits":0,"office_hour_visits":3,"lms_logins":13,"retained_next_semester":1},{"student_id":36,"risk_category":"High Risk","freshman_success_index":55.09,"midterm_gpa":2.475,"attendance_pct":0.94,"assignments_completed_pct":0.52,"stress_score":4,"belonging_score":10,"study_hours":9,"tutoring_visits":0,"office_hour_visits":2,"lms_logins":29,"retained_next_semester":1},{"student_id":37,"risk_category":"High Risk","freshman_success_index":48.393,"midterm_gpa":1.799,"attendance_pct":0.84,"assignments_completed_pct":0.81,"stress_score":8,"belonging_score":2,"study_hours":4,"tutoring_visits":4,"office_hour_visits":1,"lms_logins":15,"retained_next_semester":0},{"student_id":38,"risk_category":"Medium Risk","freshman_success_index":59.819,"midterm_gpa":3.209,"attendance_pct":0.74,"assignments_completed_pct":0.64,"stress_score":9,"belonging_score":4,"study_hours":18,"tutoring_visits":1,"office_hour_visits":2,"lms_logins":20,"retained_next_semester":1},{"student_id":39,"risk_category":"Low Risk","freshman_success_index":69.881,"midterm_gpa":1.92,"attendance_pct":0.6,"assignments_completed_pct":0.5,"stress_score":2,"belonging_score":9,"study_hours":15,"tutoring_visits":4,"office_hour_visits":0,"lms_logins":23,"retained_next_semester":1},{"student_id":40,"risk_category":"High Risk","freshman_success_index":45.679,"midterm_gpa":1.426,"attendance_pct":0.61,"assignments_completed_pct":0.64,"stress_score":8,"belonging_score":2,"study_hours":14,"tutoring_visits":1,"office_hour_visits":0,"lms_logins":23,"retained_next_semester":0},{"student_id":41,"risk_category":"High Risk","freshman_success_index":57.54,"midterm_gpa":1.354,"attendance_pct":0.89,"assignments_completed_pct":0.7,"stress_score":8,"belonging_score":1,"study_hours":15,"tutoring_visits":2,"office_hour_visits":0,"lms_logins":15,"retained_next_semester":0},{"student_id":42,"risk_category":"High Risk","freshman_success_index":55.598,"midterm_gpa":3.058,"attendance_pct":0.73,"assignments_completed_pct":0.84,"stress_score":7,"belonging_score":9,"study_hours":4,"tutoring_visits":4,"office_hour_visits":0,"lms_logins":5,"retained_next_semester":1},{"student_id":43,"risk_category":"Medium Risk","freshman_success_index":57.579,"midterm_gpa":1.592,"attendance_pct":0.67,"assignments_completed_pct":0.54,"stress_score":5,"belonging_score":1,"study_hours":17,"tutoring_visits":0,"office_hour_visits":1,"lms_logins":3,"retained_next_semester":0},{"student_id":44,"risk_category":"Low Risk","freshman_success_index":68.098,"midterm_gpa":1.533,"attendance_pct":0.76,"assignments_completed_pct":0.91,"stress_score":8,"belonging_score":2,"study_hours":12,"tutoring_visits":3,"office_hour_visits":1,"lms_logins":10,"retained_next_semester":0},{"student_id":45,"risk_category":"Medium Risk","freshman_success_index":57.864,"midterm_gpa":2.253,"attendance_pct":0.69,"assignments_completed_pct":0.92,"stress_score":9,"belonging_score":4,"study_hours":3,"tutoring_visits":4,"office_hour_visits":0,"lms_logins":3,"retained_next_semester":1},{"student_id":46,"risk_category":"Low Risk","freshman_success_index":75.405,"midterm_gpa":2.286,"attendance_pct":0.74,"assignments_completed_pct":0.86,"stress_score":4,"belonging_score":7,"study_hours":10,"tutoring_visits":4,"office_hour_visits":2,"lms_logins":17,"retained_next_semester":1},{"student_id":47,"risk_category":"High Risk","freshman_success_index":51.614,"midterm_gpa":0.942,"attendance_pct":0.93,"assignments_completed_pct":0.53,"stress_score":3,"belonging_score":9,"study_hours":8,"tutoring_visits":3,"office_hour_visits":1,"lms_logins":13,"retained_next_semester":0},{"student_id":48,"risk_category":"Low Risk","freshman_success_index":79.19,"midterm_gpa":2.42,"attendance_pct":0.86,"assignments_completed_pct":0.64,"stress_score":1,"belonging_score":8,"study_hours":12,"tutoring_visits":1,"office_hour_visits":1,"lms_logins":1,"retained_next_semester":1},{"student_id":49,"risk_category":"Low Risk","freshman_success_index":69.426,"midterm_gpa":2.364,"attendance_pct":0.69,"assignments_completed_pct":0.84,"stress_score":2,"belonging_score":4,"study_hours":12,"tutoring_visits":3,"office_hour_visits":2,"lms_logins":9,"retained_next_semester":1},{"student_id":50,"risk_category":"High Risk","freshman_success_index":52.902,"midterm_gpa":1.839,"attendance_pct":0.76,"assignments_completed_pct":0.87,"stress_score":10,"belonging_score":1,"study_hours":3,"tutoring_visits":0,"office_hour_visits":3,"lms_logins":13,"retained_next_semester":0},{"student_id":51,"risk_category":"Medium Risk","freshman_success_index":64.464,"midterm_gpa":2.029,"attendance_pct":0.83,"assignments_completed_pct":0.72,"stress_score":5,"belonging_score":10,"study_hours":6,"tutoring_visits":3,"office_hour_visits":1,"lms_logins":10,"retained_next_semester":1},{"student_id":52,"risk_category":"Low Risk","freshman_success_index":73.071,"midterm_gpa":2.79,"attendance_pct":0.82,"assignments_completed_pct":0.78,"stress_score":4,"belonging_score":5,"study_hours":15,"tutoring_visits":4,"office_hour_visits":2,"lms_logins":12,"retained_next_semester":1},{"student_id":53,"risk_category":"High Risk","freshman_success_index":50.452,"midterm_gpa":1.988,"attendance_pct":0.8,"assignments_completed_pct":0.6,"stress_score":6,"belonging_score":2,"study_hours":8,"tutoring_visits":0,"office_hour_visits":3,"lms_logins":18,"retained_next_semester":0},{"student_id":54,"risk_category":"Low Risk","freshman_success_index":70.021,"midterm_gpa":2.709,"attendance_pct":0.59,"assignments_completed_pct":0.94,"stress_score":1,"belonging_score":3,"study_hours":20,"tutoring_visits":4,"office_hour_visits":2,"lms_logins":23,"retained_next_semester":1},{"student_id":55,"risk_category":"Medium Risk","freshman_success_index":62.486,"midterm_gpa":3.106,"attendance_pct":0.89,"assignments_completed_pct":0.89,"stress_score":7,"belonging_score":4,"study_hours":8,"tutoring_visits":0,"office_hour_visits":3,"lms_logins":27,"retained_next_semester":1},{"student_id":56,"risk_category":"Low Risk","freshman_success_index":66.179,"midterm_gpa":1.102,"attendance_pct":1.0,"assignments_completed_pct":0.75,"stress_score":4,"belonging_score":2,"study_hours":16,"tutoring_visits":1,"office_hour_visits":0,"lms_logins":7,"retained_next_semester":0},{"student_id":57,"risk_category":"High Risk","freshman_success_index":51.645,"midterm_gpa":1.714,"attendance_pct":0.75,"assignments_completed_pct":0.52,"stress_score":9,"belonging_score":7,"study_hours":13,"tutoring_visits":1,"office_hour_visits":0,"lms_logins":8,"retained_next_semester":0},{"student_id":58,"risk_category":"Medium Risk","freshman_success_index":58.398,"midterm_gpa":2.453,"attendance_pct":0.67,"assignments_completed_pct":0.72,"stress_score":6,"belonging_score":5,"study_hours":16,"tutoring_visits":1,"office_hour_visits":3,"lms_logins":28,"retained_next_semester":1},{"student_id":59,"risk_category":"Medium Risk","freshman_success_index":62.94,"midterm_gpa":1.734,"attendance_pct":0.72,"assignments_completed_pct":0.83,"stress_score":7,"belonging_score":10,"study_hours":13,"tutoring_visits":1,"office_hour_visits":1,"lms_logins":6,"retained_next_semester":1},{"student_id":60,"risk_category":"Low Risk","freshman_success_index":71.979,"midterm_gpa":2.088,"attendance_pct":0.82,"assignments_completed_pct":0.65,"stress_score":2,"belonging_score":4,"study_hours":20,"tutoring_visits":0,"office_hour_visits":1,"lms_logins":19,"retained_next_semester":1},{"student_id":61,"risk_category":"Low Risk","freshman_success_index":66.95,"midterm_gpa":1.972,"attendance_pct":0.83,"assignments_completed_pct":0.8,"stress_score":5,"belonging_score":9,"study_hours":6,"tutoring_visits":4,"office_hour_visits":3,"lms_logins":14,"retained_next_semester":0},{"student_id":62,"risk_category":"Low Risk","freshman_success_index":80.152,"midterm_gpa":2.555,"attendance_pct":1.0,"assignments_completed_pct":0.98,"stress_score":3,"belonging_score":8,"study_hours":20,"tutoring_visits":2,"office_hour_visits":1,"lms_logins":18,"retained_next_semester":1},{"student_id":63,"risk_category":"Medium Risk","freshman_success_index":62.493,"midterm_gpa":1.89,"attendance_pct":0.77,"assignments_completed_pct":0.72,"stress_score":9,"belonging_score":5,"study_hours":13,"tutoring_visits":4,"office_hour_visits":1,"lms_logins":7,"retained_next_semester":0},{"student_id":64,"risk_category":"Low Risk","freshman_success_index":69.226,"midterm_gpa":2.197,"attendance_pct":0.91,"assignments_completed_pct":0.94,"stress_score":4,"belonging_score":8,"study_hours":18,"tutoring_visits":2,"office_hour_visits":3,"lms_logins":17,"retained_next_semester":1},{"student_id":65,"risk_category":"High Risk","freshman_success_index":55.321,"midterm_gpa":1.731,"attendance_pct":0.66,"assignments_completed_pct":0.89,"stress_score":6,"belonging_score":2,"study_hours":2,"tutoring_visits":3,"office_hour_visits":3,"lms_logins":4,"retained_next_semester":1},{"student_id":66,"risk_category":"High Risk","freshman_success_index":49.207,"midterm_gpa":1.889,"attendance_pct":0.61,"assignments_completed_pct":0.58,"stress_score":10,"belonging_score":7,"study_hours":1,"tutoring_visits":1,"office_hour_visits":1,"lms_logins":26,"retained_next_semester":1},{"student_id":67,"risk_category":"High Risk","freshman_success_index":52.04,"midterm_gpa":1.97,"attendance_pct":0.8,"assignments_completed_pct":0.89,"stress_score":5,"belonging_score":7,"study_hours":12,"tutoring_visits":1,"office_hour_visits":1,"lms_logins":2,"retained_next_semester":1},{"student_id":68,"risk_category":"Medium Risk","freshman_success_index":59.814,"midterm_gpa":1.074,"attendance_pct":0.72,"assignments_completed_pct":0.92,"stress_score":9,"belonging_score":2,"study_hours":3,"tutoring_visits":3,"office_hour_visits":1,"lms_logins":25,"retained_next_semester":0},{"student_id":69,"risk_category":"Low Risk","freshman_success_index":68.326,"midterm_gpa":2.001,"attendance_pct":0.59,"assignments_completed_pct":0.8,"stress_score":2,"belonging_score":1,"study_hours":20,"tutoring_visits":4,"office_hour_visits":1,"lms_logins":29,"retained_next_semester":1},{"student_id":70,"risk_category":"Low Risk","freshman_success_index":73.531,"midterm_gpa":2.045,"attendance_pct":0.78,"assignments_completed_pct":0.63,"stress_score":1,"belonging_score":8,"study_hours":5,"tutoring_visits":2,"office_hour_visits":2,"lms_logins":18,"retained_next_semester":1},{"student_id":71,"risk_category":"High Risk","freshman_success_index":56.319,"midterm_gpa":2.047,"attendance_pct":0.57,"assignments_completed_pct":0.71,"stress_score":2,"belonging_score":4,"study_hours":10,"tutoring_visits":1,"office_hour_visits":2,"lms_logins":19,"retained_next_semester":0},{"student_id":72,"risk_category":"Medium Risk","freshman_success_index":57.95,"midterm_gpa":2.129,"attendance_pct":0.77,"assignments_completed_pct":0.76,"stress_score":9,"belonging_score":1,"study_hours":14,"tutoring_visits":4,"office_hour_visits":3,"lms_logins":6,"retained_next_semester":1},{"student_id":73,"risk_category":"High Risk","freshman_success_index":55.586,"midterm_gpa":1.775,"attendance_pct":0.92,"assignments_completed_pct":0.8,"stress_score":6,"belonging_score":1,"study_hours":10,"tutoring_visits":2,"office_hour_visits":1,"lms_logins":18,"retained_next_semester":0},{"student_id":74,"risk_category":"High Risk","freshman_success_index":48.283,"midterm_gpa":1.386,"attendance_pct":0.56,"assignments_completed_pct":0.67,"stress_score":8,"belonging_score":4,"study_hours":2,"tutoring_visits":0,"office_hour_visits":0,"lms_logins":12,"retained_next_semester":0},{"student_id":75,"risk_category":"High Risk","freshman_success_index":56.007,"midterm_gpa":2.682,"attendance_pct":0.75,"assignments_completed_pct":0.66,"stress_score":2,"belonging_score":4,"study_hours":16,"tutoring_visits":2,"office_hour_visits":0,"lms_logins":28,"retained_next_semester":1},{"student_id":76,"risk_category":"High Risk","freshman_success_index":53.581,"midterm_gpa":2.395,"attendance_pct":0.95,"assignments_completed_pct":0.93,"stress_score":10,"belonging_score":10,"study_hours":12,"tutoring_visits":2,"office_hour_visits":2,"lms_logins":15,"retained_next_semester":0},{"student_id":77,"risk_category":"Low Risk","freshman_success_index":72.436,"midterm_gpa":2.093,"attendance_pct":0.81,"assignments_completed_pct":0.9,"stress_score":6,"belonging_score":6,"study_hours":8,"tutoring_visits":1,"office_hour_visits":2,"lms_logins":28,"retained_next_semester":1},{"student_id":78,"risk_category":"Medium Risk","freshman_success_index":60.971,"midterm_gpa":1.887,"attendance_pct":0.94,"assignments_completed_pct":0.52,"stress_score":5,"belonging_score":9,"study_hours":12,"tutoring_visits":4,"office_hour_visits":2,"lms_logins":7,"retained_next_semester":0},{"student_id":79,"risk_category":"Low Risk","freshman_success_index":66.767,"midterm_gpa":2.624,"attendance_pct":0.8,"assignments_completed_pct":0.54,"stress_score":1,"belonging_score":1,"study_hours":16,"tutoring_visits":0,"office_hour_visits":0,"lms_logins":3,"retained_next_semester":1},{"student_id":80,"risk_category":"Medium Risk","freshman_success_index":59.171,"midterm_gpa":2.131,"attendance_pct":0.76,"assignments_completed_pct":0.68,"stress_score":3,"belonging_score":5,"study_hours":3,"tutoring_visits":4,"office_hour_visits":2,"lms_logins":11,"retained_next_semester":1},{"student_id":81,"risk_category":"Low Risk","freshman_success_index":66.41,"midterm_gpa":2.445,"attendance_pct":0.97,"assignments_completed_pct":0.77,"stress_score":6,"belonging_score":10,"study_hours":8,"tutoring_visits":2,"office_hour_visits":3,"lms_logins":28,"retained_next_semester":1},{"student_id":82,"risk_category":"High Risk","freshman_success_index":50.469,"midterm_gpa":1.284,"attendance_pct":0.63,"assignments_completed_pct":0.96,"stress_score":8,"belonging_score":5,"study_hours":2,"tutoring_visits":3,"office_hour_visits":0,"lms_logins":29,"retained_next_semester":0},{"student_id":83,"risk_category":"High Risk","freshman_success_index":53.895,"midterm_gpa":0.653,"attendance_pct":0.85,"assignments_completed_pct":0.87,"stress_score":8,"belonging_score":1,"study_hours":11,"tutoring_visits":1,"office_hour_visits":0,"lms_logins":23,"retained_next_semester":0},{"student_id":84,"risk_category":"Low Risk","freshman_success_index":66.002,"midterm_gpa":2.391,"attendance_pct":0.72,"assignments_completed_pct":0.65,"stress_score":8,"belonging_score":9,"study_hours":8,"tutoring_visits":3,"office_hour_visits":0,"lms_logins":25,"retained_next_semester":1},{"student_id":85,"risk_category":"Medium Risk","freshman_success_index":59.598,"midterm_gpa":2.63,"attendance_pct":0.9,"assignments_completed_pct":0.77,"stress_score":8,"belonging_score":1,"study_hours":13,"tutoring_visits":3,"office_hour_visits":1,"lms_logins":23,"retained_next_semester":1},{"student_id":86,"risk_category":"High Risk","freshman_success_index":48.857,"midterm_gpa":2.552,"attendance_pct":0.78,"assignments_completed_pct":0.52,"stress_score":6,"belonging_score":1,"study_hours":19,"tutoring_visits":2,"office_hour_visits":0,"lms_logins":1,"retained_next_semester":1},{"student_id":87,"risk_category":"Low Risk","freshman_success_index":75.631,"midterm_gpa":2.967,"attendance_pct":0.56,"assignments_completed_pct":0.89,"stress_score":5,"belonging_score":1,"study_hours":20,"tutoring_visits":1,"office_hour_visits":3,"lms_logins":2,"retained_next_semester":1},{"student_id":88,"risk_category":"High Risk","freshman_success_index":37.852,"midterm_gpa":0.851,"attendance_pct":0.71,"assignments_completed_pct":0.75,"stress_score":9,"belonging_score":10,"study_hours":8,"tutoring_visits":3,"office_hour_visits":0,"lms_logins":29,"retained_next_semester":0},{"student_id":89,"risk_category":"Medium Risk","freshman_success_index":60.548,"midterm_gpa":2.043,"attendance_pct":0.88,"assignments_completed_pct":0.62,"stress_score":10,"belonging_score":8,"study_hours":14,"tutoring_visits":4,"office_hour_visits":0,"lms_logins":11,"retained_next_semester":1},{"student_id":90,"risk_category":"Medium Risk","freshman_success_index":63.802,"midterm_gpa":2.415,"attendance_pct":0.86,"assignments_completed_pct":0.83,"stress_score":8,"belonging_score":10,"study_hours":8,"tutoring_visits":3,"office_hour_visits":0,"lms_logins":27,"retained_next_semester":1},{"student_id":91,"risk_category":"Medium Risk","freshman_success_index":60.086,"midterm_gpa":2.044,"attendance_pct":0.71,"assignments_completed_pct":0.81,"stress_score":1,"belonging_score":1,"study_hours":11,"tutoring_visits":2,"office_hour_visits":1,"lms_logins":8,"retained_next_semester":0},{"student_id":92,"risk_category":"Medium Risk","freshman_success_index":63.493,"midterm_gpa":3.011,"attendance_pct":0.95,"assignments_completed_pct":0.94,"stress_score":5,"belonging_score":9,"study_hours":12,"tutoring_visits":2,"office_hour_visits":3,"lms_logins":11,"retained_next_semester":1},{"student_id":93,"risk_category":"Low Risk","freshman_success_index":69.586,"midterm_gpa":2.691,"attendance_pct":0.91,"assignments_completed_pct":0.61,"stress_score":8,"belonging_score":6,"study_hours":4,"tutoring_visits":2,"office_hour_visits":1,"lms_logins":15,"retained_next_semester":1},{"student_id":94,"risk_category":"High Risk","freshman_success_index":52.119,"midterm_gpa":1.978,"attendance_pct":0.57,"assignments_completed_pct":0.53,"stress_score":3,"belonging_score":8,"study_hours":9,"tutoring_visits":1,"office_hour_visits":2,"lms_logins":5,"retained_next_semester":1},{"student_id":95,"risk_category":"High Risk","freshman_success_index":51.362,"midterm_gpa":1.269,"attendance_pct":0.68,"assignments_completed_pct":0.96,"stress_score":10,"belonging_score":2,"study_hours":5,"tutoring_visits":0,"office_hour_visits":1,"lms_logins":26,"retained_next_semester":0},{"student_id":96,"risk_category":"High Risk","freshman_success_index":52.729,"midterm_gpa":2.8,"attendance_pct":0.95,"assignments_completed_pct":0.87,"stress_score":4,"belonging_score":5,"study_hours":11,"tutoring_visits":1,"office_hour_visits":0,"lms_logins":16,"retained_next_semester":1},{"student_id":97,"risk_category":"Low Risk","freshman_success_index":81.726,"midterm_gpa":2.196,"attendance_pct":0.69,"assignments_completed_pct":0.66,"stress_score":2,"belonging_score":1,"study_hours":12,"tutoring_visits":2,"office_hour_visits":3,"lms_logins":3,"retained_next_semester":1},{"student_id":98,"risk_category":"Medium Risk","freshman_success_index":60.564,"midterm_gpa":1.872,"attendance_pct":0.78,"assignments_completed_pct":0.71,"stress_score":7,"belonging_score":1,"study_hours":13,"tutoring_visits":4,"office_hour_visits":0,"lms_logins":29,"retained_next_semester":1},{"student_id":99,"risk_category":"High Risk","freshman_success_index":57.481,"midterm_gpa":2.577,"attendance_pct":1.0,"assignments_completed_pct":0.84,"stress_score":9,"belonging_score":6,"study_hours":5,"tutoring_visits":3,"office_hour_visits":1,"lms_logins":7,"retained_next_semester":1},{"student_id":100,"risk_category":"Medium Risk","freshman_success_index":61.695,"midterm_gpa":2.36,"attendance_pct":0.88,"assignments_completed_pct":0.86,"stress_score":4,"belonging_score":2,"study_hours":17,"tutoring_visits":1,"office_hour_visits":0,"lms_logins":23,"retained_next_semester":1},{"student_id":101,"risk_category":"Low Risk","freshman_success_index":68.464,"midterm_gpa":2.386,"attendance_pct":0.94,"assignments_completed_pct":0.81,"stress_score":1,"belonging_score":7,"study_hours":16,"tutoring_visits":2,"office_hour_visits":2,"lms_logins":29,"retained_next_semester":1},{"student_id":102,"risk_category":"Low Risk","freshman_success_index":76.521,"midterm_gpa":2.86,"attendance_pct":0.6,"assignments_completed_pct":0.93,"stress_score":5,"belonging_score":5,"study_hours":1,"tutoring_visits":3,"office_hour_visits":3,"lms_logins":16,"retained_next_semester":1},{"student_id":103,"risk_category":"Medium Risk","freshman_success_index":60.493,"midterm_gpa":2.459,"attendance_pct":0.76,"assignments_completed_pct":0.53,"stress_score":8,"belonging_score":3,"study_hours":20,"tutoring_visits":4,"office_hour_visits":1,"lms_logins":6,"retained_next_semester":1},{"student_id":104,"risk_category":"Low Risk","freshman_success_index":68.583,"midterm_gpa":3.152,"attendance_pct":0.69,"assignments_completed_pct":0.96,"stress_score":7,"belonging_score":4,"study_hours":6,"tutoring_visits":4,"office_hour_visits":3,"lms_logins":3,"retained_next_semester":1},{"student_id":105,"risk_category":"Medium Risk","freshman_success_index":58.643,"midterm_gpa":0.978,"attendance_pct":0.91,"assignments_completed_pct":0.69,"stress_score":9,"belonging_score":9,"study_hours":8,"tutoring_visits":4,"office_hour_visits":1,"lms_logins":7,"retained_next_semester":0},{"student_id":106,"risk_category":"Medium Risk","freshman_success_index":62.562,"midterm_gpa":2.256,"attendance_pct":0.97,"assignments_completed_pct":0.75,"stress_score":10,"belonging_score":3,"study_hours":12,"tutoring_visits":0,"office_hour_visits":1,"lms_logins":14,"retained_next_semester":1},{"student_id":107,"risk_category":"High Risk","freshman_success_index":55.157,"midterm_gpa":1.718,"attendance_pct":0.94,"assignments_completed_pct":0.68,"stress_score":8,"belonging_score":9,"study_hours":6,"tutoring_visits":0,"office_hour_visits":2,"lms_logins":1,"retained_next_semester":1},{"student_id":108,"risk_category":"High Risk","freshman_success_index":56.586,"midterm_gpa":1.637,"attendance_pct":0.9,"assignments_completed_pct":0.82,"stress_score":8,"belonging_score":5,"study_hours":16,"tutoring_visits":2,"office_hour_visits":1,"lms_logins":8,"retained_next_semester":0},{"student_id":109,"risk_category":"Medium Risk","freshman_success_index":62.343,"midterm_gpa":2.971,"attendance_pct":0.73,"assignments_completed_pct":0.65,"stress_score":5,"belonging_score":5,"study_hours":12,"tutoring_visits":4,"office_hour_visits":1,"lms_logins":21,"retained_next_semester":1},{"student_id":110,"risk_category":"Medium Risk","freshman_success_index":59.86,"midterm_gpa":2.882,"attendance_pct":0.61,"assignments_completed_pct":0.86,"stress_score":3,"belonging_score":7,"study_hours":18,"tutoring_visits":2,"office_hour_visits":3,"lms_logins":23,"retained_next_semester":1},{"student_id":111,"risk_category":"High Risk","freshman_success_index":41.69,"midterm_gpa":1.881,"attendance_pct":0.94,"assignments_completed_pct":0.66,"stress_score":8,"belonging_score":5,"study_hours":8,"tutoring_visits":0,"office_hour_visits":2,"lms_logins":21,"retained_next_semester":0},{"student_id":112,"risk_category":"Low Risk","freshman_success_index":70.16,"midterm_gpa":2.864,"attendance_pct":0.97,"assignments_completed_pct":0.92,"stress_score":9,"belonging_score":9,"study_hours":7,"tutoring_visits":3,"office_hour_visits":2,"lms_logins":21,"retained_next_semester":1},{"student_id":113,"risk_category":"Low Risk","freshman_success_index":76.7,"midterm_gpa":1.647,"attendance_pct":0.91,"assignments_completed_pct":0.97,"stress_score":2,"belonging_score":2,"study_hours":7,"tutoring_visits":0,"office_hour_visits":0,"lms_logins":1,"retained_next_semester":1},{"student_id":114,"risk_category":"Low Risk","freshman_success_index":69.119,"midterm_gpa":2.322,"attendance_pct":0.87,"assignments_completed_pct":0.93,"stress_score":5,"belonging_score":2,"study_hours":5,"tutoring_visits":3,"office_hour_visits":0,"lms_logins":16,"retained_next_semester":1},{"student_id":115,"risk_category":"Medium Risk","freshman_success_index":61.664,"midterm_gpa":1.618,"attendance_pct":0.55,"assignments_completed_pct":0.78,"stress_score":6,"belonging_score":8,"study_hours":19,"tutoring_visits":3,"office_hour_visits":1,"lms_logins":12,"retained_next_semester":0},{"student_id":116,"risk_category":"Low Risk","freshman_success_index":70.731,"midterm_gpa":2.985,"attendance_pct":0.87,"assignments_completed_pct":0.82,"stress_score":9,"belonging_score":4,"study_hours":15,"tutoring_visits":3,"office_hour_visits":1,"lms_logins":16,"retained_next_semester":1},{"student_id":117,"risk_category":"Low Risk","freshman_success_index":66.95,"midterm_gpa":2.677,"attendance_pct":0.75,"assignments_completed_pct":0.58,"stress_score":1,"belonging_score":6,"study_hours":16,"tutoring_visits":4,"office_hour_visits":3,"lms_logins":6,"retained_next_semester":1},{"student_id":118,"risk_category":"Medium Risk","freshman_success_index":62.664,"midterm_gpa":2.43,"attendance_pct":0.56,"assignments_completed_pct":0.97,"stress_score":4,"belonging_score":10,"study_hours":12,"tutoring_visits":1,"office_hour_visits":3,"lms_logins":9,"retained_next_semester":1},{"student_id":119,"risk_category":"High Risk","freshman_success_index":56.902,"midterm_gpa":2.583,"attendance_pct":0.84,"assignments_completed_pct":0.79,"stress_score":8,"belonging_score":7,"study_hours":17,"tutoring_visits":3,"office_hour_visits":0,"lms_logins":7,"retained_next_semester":1},{"student_id":120,"risk_category":"High Risk","freshman_success_index":55.657,"midterm_gpa":1.196,"attendance_pct":0.81,"assignments_completed_pct":0.61,"stress_score":4,"belonging_score":8,"study_hours":20,"tutoring_visits":2,"office_hour_visits":0,"lms_logins":16,"retained_next_semester":0},{"student_id":121,"risk_category":"Medium Risk","freshman_success_index":59.433,"midterm_gpa":1.415,"attendance_pct":0.68,"assignments_completed_pct":0.86,"stress_score":6,"belonging_score":4,"study_hours":9,"tutoring_visits":4,"office_hour_visits":3,"lms_logins":4,"retained_next_semester":0},{"student_id":122,"risk_category":"Low Risk","freshman_success_index":70.571,"midterm_gpa":2.882,"attendance_pct":0.62,"assignments_completed_pct":0.98,"stress_score":5,"belonging_score":8,"study_hours":10,"tutoring_visits":3,"office_hour_visits":3,"lms_logins":27,"retained_next_semester":1},{"student_id":123,"risk_category":"Medium Risk","freshman_success_index":59.836,"midterm_gpa":2.086,"attendance_pct":0.97,"assignments_completed_pct":0.6,"stress_score":6,"belonging_score":6,"study_hours":17,"tutoring_visits":1,"office_hour_visits":2,"lms_logins":16,"retained_next_semester":1},{"student_id":124,"risk_category":"High Risk","freshman_success_index":33.379,"midterm_gpa":1.277,"attendance_pct":0.57,"assignments_completed_pct":0.86,"stress_score":10,"belonging_score":2,"study_hours":12,"tutoring_visits":0,"office_hour_visits":1,"lms_logins":11,"retained_next_semester":0},{"student_id":125,"risk_category":"Medium Risk","freshman_success_index":60.629,"midterm_gpa":2.673,"attendance_pct":0.94,"assignments_completed_pct":0.94,"stress_score":6,"belonging_score":7,"study_hours":10,"tutoring_visits":1,"office_hour_visits":0,"lms_logins":2,"retained_next_semester":1},{"student_id":126,"risk_category":"High Risk","freshman_success_index":52.795,"midterm_gpa":2.158,"attendance_pct":0.57,"assignments_completed_pct":0.51,"stress_score":9,"belonging_score":8,"study_hours":6,"tutoring_visits":0,"office_hour_visits":1,"lms_logins":21,"retained_next_semester":1},{"student_id":127,"risk_category":"Low Risk","freshman_success_index":69.671,"midterm_gpa":2.291,"attendance_pct":0.98,"assignments_completed_pct":0.86,"stress_score":3,"belonging_score":8,"study_hours":6,"tutoring_visits":3,"office_hour_visits":3,"lms_logins":19,"retained_next_semester":1},{"student_id":128,"risk_category":"Low Risk","freshman_success_index":71.919,"midterm_gpa":4.0,"attendance_pct":0.97,"assignments_completed_pct":0.85,"stress_score":7,"belonging_score":9,"study_hours":14,"tutoring_visits":2,"office_hour_visits":1,"lms_logins":18,"retained_next_semester":1},{"student_id":129,"risk_category":"Medium Risk","freshman_success_index":60.014,"midterm_gpa":2.089,"attendance_pct":0.7,"assignments_completed_pct":0.62,"stress_score":4,"belonging_score":10,"study_hours":20,"tutoring_visits":4,"office_hour_visits":0,"lms_logins":7,"retained_next_semester":0},{"student_id":130,"risk_category":"Low Risk","freshman_success_index":65.938,"midterm_gpa":1.971,"attendance_pct":0.99,"assignments_completed_pct":0.99,"stress_score":7,"belonging_score":9,"study_hours":7,"tutoring_visits":4,"office_hour_visits":2,"lms_logins":2,"retained_next_semester":1},{"student_id":131,"risk_category":"Low Risk","freshman_success_index":73.583,"midterm_gpa":2.776,"attendance_pct":1.0,"assignments_completed_pct":0.75,"stress_score":4,"belonging_score":9,"study_hours":8,"tutoring_visits":4,"office_hour_visits":3,"lms_logins":11,"retained_next_semester":1},{"student_id":132,"risk_category":"High Risk","freshman_success_index":46.424,"midterm_gpa":0.824,"attendance_pct":0.86,"assignments_completed_pct":0.7,"stress_score":8,"belonging_score":8,"study_hours":8,"tutoring_visits":1,"office_hour_visits":1,"lms_logins":28,"retained_next_semester":0},{"student_id":133,"risk_category":"High Risk","freshman_success_index":54.86,"midterm_gpa":1.746,"attendance_pct":0.95,"assignments_completed_pct":0.62,"stress_score":4,"belonging_score":5,"study_hours":18,"tutoring_visits":2,"office_hour_visits":3,"lms_logins":21,"retained_next_semester":0},{"student_id":134,"risk_category":"High Risk","freshman_success_index":43.14,"midterm_gpa":2.486,"attendance_pct":0.67,"assignments_completed_pct":0.56,"stress_score":5,"belonging_score":9,"study_hours":16,"tutoring_visits":1,"office_hour_visits":1,"lms_logins":1,"retained_next_semester":1},{"student_id":135,"risk_category":"Medium Risk","freshman_success_index":64.855,"midterm_gpa":2.805,"attendance_pct":0.68,"assignments_completed_pct":0.55,"stress_score":9,"belonging_score":10,"study_hours":12,"tutoring_visits":3,"office_hour_visits":3,"lms_logins":20,"retained_next_semester":1},{"student_id":136,"risk_category":"Low Risk","freshman_success_index":69.071,"midterm_gpa":2.473,"attendance_pct":0.94,"assignments_completed_pct":0.96,"stress_score":4,"belonging_score":8,"study_hours":9,"tutoring_visits":3,"office_hour_visits":3,"lms_logins":15,"retained_next_semester":1},{"student_id":137,"risk_category":"High Risk","freshman_success_index":55.19,"midterm_gpa":1.281,"attendance_pct":0.82,"assignments_completed_pct":0.68,"stress_score":7,"belonging_score":7,"study_hours":16,"tutoring_visits":2,"office_hour_visits":0,"lms_logins":20,"retained_next_semester":0},{"student_id":138,"risk_category":"Medium Risk","freshman_success_index":59.06,"midterm_gpa":1.984,"attendance_pct":0.77,"assignments_completed_pct":0.58,"stress_score":7,"belonging_score":4,"study_hours":19,"tutoring_visits":3,"office_hour_visits":2,"lms_logins":13,"retained_next_semester":1},{"student_id":139,"risk_category":"Medium Risk","freshman_success_index":59.229,"midterm_gpa":1.584,"attendance_pct":0.71,"assignments_completed_pct":0.71,"stress_score":4,"belonging_score":9,"study_hours":12,"tutoring_visits":0,"office_hour_visits":1,"lms_logins":18,"retained_next_semester":1},{"student_id":140,"risk_category":"High Risk","freshman_success_index":48.174,"midterm_gpa":1.257,"attendance_pct":0.73,"assignments_completed_pct":0.88,"stress_score":7,"belonging_score":9,"study_hours":14,"tutoring_visits":1,"office_hour_visits":1,"lms_logins":2,"retained_next_semester":0},{"student_id":141,"risk_category":"High Risk","freshman_success_index":56.407,"midterm_gpa":2.841,"attendance_pct":0.76,"assignments_completed_pct":0.91,"stress_score":9,"belonging_score":5,"study_hours":14,"tutoring_visits":2,"office_hour_visits":0,"lms_logins":9,"retained_next_semester":1},{"student_id":142,"risk_category":"Low Risk","freshman_success_index":70.695,"midterm_gpa":2.236,"attendance_pct":0.88,"assignments_completed_pct":0.66,"stress_score":2,"belonging_score":3,"study_hours":12,"tutoring_visits":1,"office_hour_visits":0,"lms_logins":25,"retained_next_semester":1},{"student_id":143,"risk_category":"Medium Risk","freshman_success_index":62.019,"midterm_gpa":1.177,"attendance_pct":0.56,"assignments_completed_pct":0.7,"stress_score":9,"belonging_score":7,"study_hours":6,"tutoring_visits":1,"office_hour_visits":2,"lms_logins":28,"retained_next_semester":0},{"student_id":144,"risk_category":"Low Risk","freshman_success_index":67.076,"midterm_gpa":1.551,"attendance_pct":0.83,"assignments_completed_pct":0.81,"stress_score":4,"belonging_score":1,"study_hours":10,"tutoring_visits":3,"office_hour_visits":2,"lms_logins":13,"retained_next_semester":0},{"student_id":145,"risk_category":"Medium Risk","freshman_success_index":61.543,"midterm_gpa":2.676,"attendance_pct":0.88,"assignments_completed_pct":0.68,"stress_score":8,"belonging_score":4,"study_hours":8,"tutoring_visits":4,"office_hour_visits":1,"lms_logins":17,"retained_next_semester":1},{"student_id":146,"risk_category":"Medium Risk","freshman_success_index":59.031,"midterm_gpa":2.095,"attendance_pct":0.94,"assignments_completed_pct":0.87,"stress_score":8,"belonging_score":7,"study_hours":14,"tutoring_visits":3,"office_hour_visits":1,"lms_logins":17,"retained_next_semester":1},{"student_id":147,"risk_category":"Medium Risk","freshman_success_index":59.548,"midterm_gpa":1.373,"attendance_pct":0.63,"assignments_completed_pct":0.77,"stress_score":6,"belonging_score":1,"study_hours":19,"tutoring_visits":2,"office_hour_visits":2,"lms_logins":28,"retained_next_semester":0},{"student_id":148,"risk_category":"High Risk","freshman_success_index":54.507,"midterm_gpa":2.069,"attendance_pct":0.85,"assignments_completed_pct":0.86,"stress_score":3,"belonging_score":1,"study_hours":9,"tutoring_visits":2,"office_hour_visits":0,"lms_logins":9,"retained_next_semester":0},{"student_id":149,"risk_category":"Medium Risk","freshman_success_index":62.19,"midterm_gpa":1.574,"attendance_pct":0.93,"assignments_completed_pct":0.57,"stress_score":5,"belonging_score":7,"study_hours":18,"tutoring_visits":0,"office_hour_visits":2,"lms_logins":9,"retained_next_semester":0},{"student_id":150,"risk_category":"High Risk","freshman_success_index":53.081,"midterm_gpa":2.051,"attendance_pct":0.61,"assignments_completed_pct":0.77,"stress_score":4,"belonging_score":3,"study_hours":6,"tutoring_visits":1,"office_hour_visits":3,"lms_logins":13,"retained_next_semester":1},{"student_id":151,"risk_category":"Medium Risk","freshman_success_index":64.698,"midterm_gpa":1.523,"attendance_pct":0.93,"assignments_completed_pct":0.58,"stress_score":5,"belonging_score":4,"study_hours":13,"tutoring_visits":4,"office_hour_visits":0,"lms_logins":20,"retained_next_semester":0},{"student_id":152,"risk_category":"Low Risk","freshman_success_index":69.452,"midterm_gpa":2.055,"attendance_pct":0.65,"assignments_completed_pct":0.55,"stress_score":1,"belonging_score":8,"study_hours":1,"tutoring_visits":2,"office_hour_visits":1,"lms_logins":29,"retained_next_semester":1},{"student_id":153,"risk_category":"Low Risk","freshman_success_index":73.581,"midterm_gpa":1.93,"attendance_pct":0.71,"assignments_completed_pct":0.77,"stress_score":2,"belonging_score":2,"study_hours":14,"tutoring_visits":4,"office_hour_visits":0,"lms_logins":2,"retained_next_semester":1},{"student_id":154,"risk_category":"High Risk","freshman_success_index":45.502,"midterm_gpa":1.515,"attendance_pct":0.84,"assignments_completed_pct":0.93,"stress_score":7,"belonging_score":3,"study_hours":9,"tutoring_visits":0,"office_hour_visits":3,"lms_logins":13,"retained_next_semester":0},{"student_id":155,"risk_category":"Medium Risk","freshman_success_index":62.517,"midterm_gpa":2.609,"attendance_pct":0.86,"assignments_completed_pct":0.73,"stress_score":4,"belonging_score":3,"study_hours":4,"tutoring_visits":0,"office_hour_visits":0,"lms_logins":24,"retained_next_semester":1},{"student_id":156,"risk_category":"Low Risk","freshman_success_index":67.419,"midterm_gpa":2.215,"attendance_pct":0.74,"assignments_completed_pct":0.88,"stress_score":3,"belonging_score":5,"study_hours":9,"tutoring_visits":1,"office_hour_visits":2,"lms_logins":8,"retained_next_semester":0},{"student_id":157,"risk_category":"Low Risk","freshman_success_index":66.364,"midterm_gpa":1.89,"attendance_pct":0.97,"assignments_completed_pct":0.94,"stress_score":6,"belonging_score":3,"study_hours":2,"tutoring_visits":3,"office_hour_visits":1,"lms_logins":14,"retained_next_semester":0},{"student_id":158,"risk_category":"High Risk","freshman_success_index":51.619,"midterm_gpa":2.135,"attendance_pct":0.6,"assignments_completed_pct":1.0,"stress_score":5,"belonging_score":9,"study_hours":10,"tutoring_visits":2,"office_hour_visits":1,"lms_logins":23,"retained_next_semester":1},{"student_id":159,"risk_category":"High Risk","freshman_success_index":56.307,"midterm_gpa":2.008,"attendance_pct":0.64,"assignments_completed_pct":0.99,"stress_score":4,"belonging_score":9,"study_hours":1,"tutoring_visits":1,"office_hour_visits":1,"lms_logins":7,"retained_next_semester":0},{"student_id":160,"risk_category":"Low Risk","freshman_success_index":70.807,"midterm_gpa":2.379,"attendance_pct":0.7,"assignments_completed_pct":0.63,"stress_score":1,"belonging_score":7,"study_hours":16,"tutoring_visits":0,"office_hour_visits":2,"lms_logins":25,"retained_next_semester":1},{"student_id":161,"risk_category":"Low Risk","freshman_success_index":67.09,"midterm_gpa":1.931,"attendance_pct":0.79,"assignments_completed_pct":0.57,"stress_score":3,"belonging_score":7,"study_hours":2,"tutoring_visits":1,"office_hour_visits":1,"lms_logins":22,"retained_next_semester":1},{"student_id":162,"risk_category":"Low Risk","freshman_success_index":65.581,"midterm_gpa":4.0,"attendance_pct":0.79,"assignments_completed_pct":0.59,"stress_score":2,"belonging_score":1,"study_hours":12,"tutoring_visits":2,"office_hour_visits":2,"lms_logins":9,"retained_next_semester":1},{"student_id":163,"risk_category":"High Risk","freshman_success_index":45.102,"midterm_gpa":1.729,"attendance_pct":0.77,"assignments_completed_pct":0.74,"stress_score":9,"belonging_score":6,"study_hours":18,"tutoring_visits":1,"office_hour_visits":2,"lms_logins":9,"retained_next_semester":1},{"student_id":164,"risk_category":"High Risk","freshman_success_index":55.581,"midterm_gpa":2.132,"attendance_pct":0.74,"assignments_completed_pct":0.64,"stress_score":6,"belonging_score":7,"study_hours":10,"tutoring_visits":4,"office_hour_visits":0,"lms_logins":11,"retained_next_semester":0},{"student_id":165,"risk_category":"Medium Risk","freshman_success_index":61.41,"midterm_gpa":2.274,"attendance_pct":0.63,"assignments_completed_pct":0.71,"stress_score":8,"belonging_score":10,"study_hours":1,"tutoring_visits":2,"office_hour_visits":3,"lms_logins":5,"retained_next_semester":1},{"student_id":166,"risk_category":"High Risk","freshman_success_index":53.21,"midterm_gpa":2.611,"attendance_pct":0.87,"assignments_completed_pct":0.59,"stress_score":7,"belonging_score":10,"study_hours":18,"tutoring_visits":4,"office_hour_visits":1,"lms_logins":3,"retained_next_semester":1},{"student_id":167,"risk_category":"High Risk","freshman_success_index":55.69,"midterm_gpa":1.487,"attendance_pct":0.75,"assignments_completed_pct":0.75,"stress_score":5,"belonging_score":1,"study_hours":15,"tutoring_visits":0,"office_hour_visits":2,"lms_logins":21,"retained_next_semester":0},{"student_id":168,"risk_category":"Medium Risk","freshman_success_index":60.367,"midterm_gpa":2.25,"attendance_pct":0.61,"assignments_completed_pct":0.77,"stress_score":7,"belonging_score":2,"study_hours":17,"tutoring_visits":4,"office_hour_visits":3,"lms_logins":3,"retained_next_semester":0},{"student_id":169,"risk_category":"Medium Risk","freshman_success_index":65.148,"midterm_gpa":1.808,"attendance_pct":0.81,"assignments_completed_pct":0.73,"stress_score":5,"belonging_score":6,"study_hours":17,"tutoring_visits":3,"office_hour_visits":1,"lms_logins":25,"retained_next_semester":1},{"student_id":170,"risk_category":"Low Risk","freshman_success_index":81.164,"midterm_gpa":3.435,"attendance_pct":0.76,"assignments_completed_pct":0.97,"stress_score":5,"belonging_score":3,"study_hours":3,"tutoring_visits":3,"office_hour_visits":1,"lms_logins":11,"retained_next_semester":1},{"student_id":171,"risk_category":"Medium Risk","freshman_success_index":61.931,"midterm_gpa":1.933,"attendance_pct":0.8,"assignments_completed_pct":0.77,"stress_score":1,"belonging_score":7,"study_hours":15,"tutoring_visits":3,"office_hour_visits":1,"lms_logins":14,"retained_next_semester":0},{"student_id":172,"risk_category":"Low Risk","freshman_success_index":65.976,"midterm_gpa":2.56,"attendance_pct":0.94,"assignments_completed_pct":0.56,"stress_score":2,"belonging_score":10,"study_hours":19,"tutoring_visits":4,"office_hour_visits":1,"lms_logins":26,"retained_next_semester":1},{"student_id":173,"risk_category":"Low Risk","freshman_success_index":80.25,"midterm_gpa":2.771,"attendance_pct":0.56,"assignments_completed_pct":0.79,"stress_score":1,"belonging_score":1,"study_hours":9,"tutoring_visits":4,"office_hour_visits":3,"lms_logins":27,"retained_next_semester":1},{"student_id":174,"risk_category":"Low Risk","freshman_success_index":65.733,"midterm_gpa":2.927,"attendance_pct":0.79,"assignments_completed_pct":0.87,"stress_score":4,"belonging_score":5,"study_hours":17,"tutoring_visits":4,"office_hour_visits":3,"lms_logins":29,"retained_next_semester":1},{"student_id":175,"risk_category":"Medium Risk","freshman_success_index":63.507,"midterm_gpa":2.915,"attendance_pct":0.9,"assignments_completed_pct":0.51,"stress_score":1,"belonging_score":7,"study_hours":9,"tutoring_visits":1,"office_hour_visits":1,"lms_logins":18,"retained_next_semester":1},{"student_id":176,"risk_category":"Medium Risk","freshman_success_index":59.426,"midterm_gpa":2.48,"attendance_pct":0.86,"assignments_completed_pct":0.57,"stress_score":7,"belonging_score":7,"study_hours":7,"tutoring_visits":2,"office_hour_visits":3,"lms_logins":21,"retained_next_semester":1},{"student_id":177,"risk_category":"Medium Risk","freshman_success_index":64.843,"midterm_gpa":2.161,"attendance_pct":0.93,"assignments_completed_pct":0.85,"stress_score":4,"belonging_score":9,"study_hours":19,"tutoring_visits":3,"office_hour_visits":2,"lms_logins":26,"retained_next_semester":1},{"student_id":178,"risk_category":"High Risk","freshman_success_index":56.612,"midterm_gpa":2.002,"attendance_pct":0.65,"assignments_completed_pct":0.84,"stress_score":8,"belonging_score":8,"study_hours":4,"tutoring_visits":0,"office_hour_visits":1,"lms_logins":29,"retained_next_semester":1},{"student_id":179,"risk_category":"Low Risk","freshman_success_index":81.469,"midterm_gpa":3.392,"attendance_pct":0.98,"assignments_completed_pct":0.71,"stress_score":2,"belonging_score":1,"study_hours":14,"tutoring_visits":1,"office_hour_visits":2,"lms_logins":26,"retained_next_semester":1},{"student_id":180,"risk_category":"High Risk","freshman_success_index":51.083,"midterm_gpa":2.452,"attendance_pct":0.55,"assignments_completed_pct":1.0,"stress_score":9,"belonging_score":2,"study_hours":16,"tutoring_visits":0,"office_hour_visits":0,"lms_logins":26,"retained_next_semester":1},{"student_id":181,"risk_category":"Low Risk","freshman_success_index":69.148,"midterm_gpa":1.777,"attendance_pct":0.77,"assignments_completed_pct":0.97,"stress_score":2,"belonging_score":7,"study_hours":19,"tutoring_visits":2,"office_hour_visits":2,"lms_logins":24,"retained_next_semester":0},{"student_id":182,"risk_category":"High Risk","freshman_success_index":57.302,"midterm_gpa":1.856,"attendance_pct":0.89,"assignments_completed_pct":0.9,"stress_score":5,"belonging_score":6,"study_hours":5,"tutoring_visits":2,"office_hour_visits":1,"lms_logins":6,"retained_next_semester":0},{"student_id":183,"risk_category":"High Risk","freshman_success_index":53.779,"midterm_gpa":1.833,"attendance_pct":0.82,"assignments_completed_pct":0.87,"stress_score":5,"belonging_score":2,"study_hours":19,"tutoring_visits":1,"office_hour_visits":0,"lms_logins":15,"retained_next_semester":0},{"student_id":184,"risk_category":"Low Risk","freshman_success_index":68.35,"midterm_gpa":3.585,"attendance_pct":0.73,"assignments_completed_pct":0.56,"stress_score":1,"belonging_score":6,"study_hours":8,"tutoring_visits":4,"office_hour_visits":3,"lms_logins":13,"retained_next_semester":1},{"student_id":185,"risk_category":"High Risk","freshman_success_index":57.207,"midterm_gpa":3.122,"attendance_pct":0.7,"assignments_completed_pct":0.79,"stress_score":6,"belonging_score":4,"study_hours":16,"tutoring_visits":1,"office_hour_visits":1,"lms_logins":6,"retained_next_semester":1},{"student_id":186,"risk_category":"High Risk","freshman_success_index":53.957,"midterm_gpa":2.216,"attendance_pct":0.72,"assignments_completed_pct":0.92,"stress_score":4,"belonging_score":9,"study_hours":6,"tutoring_visits":2,"office_hour_visits":0,"lms_logins":9,"retained_next_semester":1},{"student_id":187,"risk_category":"High Risk","freshman_success_index":48.545,"midterm_gpa":1.499,"attendance_pct":0.67,"assignments_completed_pct":0.56,"stress_score":7,"belonging_score":10,"study_hours":9,"tutoring_visits":0,"office_hour_visits":1,"lms_logins":12,"retained_next_semester":0},{"student_id":188,"risk_category":"Low Risk","freshman_success_index":68.369,"midterm_gpa":2.232,"attendance_pct":0.63,"assignments_completed_pct":0.92,"stress_score":3,"belonging_score":3,"study_hours":17,"tutoring_visits":3,"office_hour_visits":0,"lms_logins":16,"retained_next_semester":1},{"student_id":189,"risk_category":"Medium Risk","freshman_success_index":59.029,"midterm_gpa":1.636,"attendance_pct":0.97,"assignments_completed_pct":0.97,"stress_score":3,"belonging_score":4,"study_hours":19,"tutoring_visits":1,"office_hour_visits":0,"lms_logins":11,"retained_next_semester":1},{"student_id":190,"risk_category":"Medium Risk","freshman_success_index":62.467,"midterm_gpa":3.059,"attendance_pct":0.65,"assignments_completed_pct":0.87,"stress_score":1,"belonging_score":3,"study_hours":9,"tutoring_visits":4,"office_hour_visits":3,"lms_logins":18,"retained_next_semester":1},{"student_id":191,"risk_category":"Low Risk","freshman_success_index":66.057,"midterm_gpa":2.568,"attendance_pct":0.58,"assignments_completed_pct":0.6,"stress_score":4,"belonging_score":2,"study_hours":13,"tutoring_visits":2,"office_hour_visits":0,"lms_logins":8,"retained_next_semester":1},{"student_id":192,"risk_category":"Low Risk","freshman_success_index":68.919,"midterm_gpa":1.237,"attendance_pct":0.77,"assignments_completed_pct":0.75,"stress_score":7,"belonging_score":7,"study_hours":11,"tutoring_visits":2,"office_hour_visits":1,"lms_logins":26,"retained_next_semester":0},{"student_id":193,"risk_category":"High Risk","freshman_success_index":51.729,"midterm_gpa":1.347,"attendance_pct":0.81,"assignments_completed_pct":0.71,"stress_score":7,"belonging_score":5,"study_hours":5,"tutoring_visits":0,"office_hour_visits":1,"lms_logins":19,"retained_next_semester":0},{"student_id":194,"risk_category":"Medium Risk","freshman_success_index":58.219,"midterm_gpa":1.665,"attendance_pct":0.99,"assignments_completed_pct":0.65,"stress_score":9,"belonging_score":8,"study_hours":5,"tutoring_visits":2,"office_hour_visits":1,"lms_logins":3,"retained_next_semester":0},{"student_id":195,"risk_category":"Low Risk","freshman_success_index":68.571,"midterm_gpa":1.405,"attendance_pct":0.77,"assignments_completed_pct":0.63,"stress_score":10,"belonging_score":2,"study_hours":4,"tutoring_visits":4,"office_hour_visits":2,"lms_logins":21,"retained_next_semester":0},{"student_id":196,"risk_category":"Medium Risk","freshman_success_index":58.49,"midterm_gpa":2.812,"attendance_pct":0.9,"assignments_completed_pct":0.92,"stress_score":5,"belonging_score":1,"study_hours":14,"tutoring_visits":0,"office_hour_visits":2,"lms_logins":3,"retained_next_semester":1},{"student_id":197,"risk_category":"Low Risk","freshman_success_index":67.814,"midterm_gpa":2.731,"attendance_pct":0.61,"assignments_completed_pct":0.53,"stress_score":2,"belonging_score":8,"study_hours":12,"tutoring_visits":1,"office_hour_visits":3,"lms_logins":16,"retained_next_semester":1},{"student_id":198,"risk_category":"Low Risk","freshman_success_index":71.5,"midterm_gpa":2.718,"attendance_pct":0.8,"assignments_completed_pct":0.8,"stress_score":3,"belonging_score":9,"study_hours":5,"tutoring_visits":0,"office_hour_visits":0,"lms_logins":6,"retained_next_semester":1},{"student_id":199,"risk_category":"Low Risk","freshman_success_index":69.981,"midterm_gpa":1.631,"attendance_pct":0.74,"assignments_completed_pct":1.0,"stress_score":9,"belonging_score":6,"study_hours":8,"tutoring_visits":4,"office_hour_visits":0,"lms_logins":20,"retained_next_semester":0},{"student_id":200,"risk_category":"High Risk","freshman_success_index":49.76,"midterm_gpa":1.035,"attendance_pct":0.72,"assignments_completed_pct":0.51,"stress_score":4,"belonging_score":1,"study_hours":16,"tutoring_visits":3,"office_hour_visits":2,"lms_logins":29,"retained_next_semester":0}],"student_trends":{"1":[77.7,67.97,68.59,55.59,68.58,60.68,58.85,41.18],"2":[55.9,46.61,51.1,54.77,47.79,75.15,54.62,59.26],"3":[50.1,69.08,65.25,72.78,52.64,44.9,73.84,66.0],"4":[47.02,53.35,75.52,45.77,77.11,55.26,59.03,75.48],"5":[71.69,58.67,84.25,52.08,54.07,63.07,77.95,64.87],"6":[59.24,66.48,62.51,73.7,79.25,67.75,58.5,70.51],"7":[69.79,43.51,74.03,64.47,68.65,70.21,55.99,49.0],"8":[72.14,64.51,54.96,63.3,55.7,51.7,72.97,48.26],"9":[65.63,70.63,62.8,68.33,75.06,72.38,48.62,58.31],"10":[54.83,48.37,43.87,72.38,63.59,68.56,63.73,62.19],"11":[71.54,69.97,57.73,61.18,59.51,68.79,68.67,44.26],"12":[60.36,56.05,72.87,62.71,59.17,62.84,65.1,59.8],"13":[61.73,75.11,66.99,65.2,54.23,57.6,44.16,73.59],"14":[58.01,49.41,67.64,69.91,74.74,55.25,49.49,78.0],"15":[45.96,68.67,65.04,56.33,60.97,42.5,49.74,66.51],"16":[52.93,59.37,63.6,60.44,64.54,54.07,49.19,72.61],"17":[54.15,63.61,52.73,54.14,50.21,78.34,41.28,74.72],"18":[69.6,50.27,67.82,48.12,59.65,47.03,63.17,60.61],"19":[64.54,56.49,68.14,50.13,49.84,56.25,52.97,72.1],"20":[70.4,66.45,60.69,53.17,54.18,65.87,55.68,66.33],"21":[49.51,78.48,58.99,66.8,68.48,61.65,74.51,61.31],"22":[51.62,48.24,64.57,81.69,54.92,69.98,59.34,54.87],"23":[59.16,60.99,49.86,51.39,49.19,57.95,46.47,50.91],"24":[59.21,65.3,52.55,72.94,69.08,51.07,67.68,58.92],"25":[46.37,64.72,75.22,78.51,60.67,52.31,61.7,46.76],"26":[59.25,64.76,55.76,61.95,48.98,65.59,58.03,53.57],"27":[51.8,54.83,75.98,76.99,51.19,58.48,63.97,79.14],"28":[64.08,78.43,71.0,50.31,71.13,63.54,59.57,69.1],"29":[67.7,64.17,63.97,57.59,58.58,51.46,59.54,66.61],"30":[71.82,73.55,71.29,66.96,51.96,56.2,65.5,52.84],"31":[53.05,69.34,67.87,66.49,71.12,51.72,49.06,54.81],"32":[64.33,53.74,62.48,81.45,34.41,60.04,68.07,62.96],"33":[45.25,77.29,66.34,74.46,64.89,52.53,61.79,65.22],"34":[56.86,70.03,64.5,46.43,42.87,45.34,55.71,62.91],"35":[67.25,55.29,63.2,52.33,77.1,59.05,69.11,56.55],"36":[80.0,55.41,68.47,68.66,55.31,56.05,56.94,55.09],"37":[59.35,71.08,66.27,58.92,58.28,58.01,53.96,48.39],"38":[70.45,68.47,52.09,49.2,72.43,63.35,76.03,59.82],"39":[59.03,65.78,56.9,60.5,62.25,66.73,60.2,69.88],"40":[52.14,41.31,57.98,64.78,58.49,58.34,50.73,45.68],"41":[47.91,64.16,67.13,50.04,58.24,55.19,53.72,57.54],"42":[62.08,61.12,54.15,75.53,68.45,64.69,60.99,55.6],"43":[71.92,56.07,67.08,70.41,43.34,33.86,44.3,57.58],"44":[59.48,58.91,57.98,68.78,48.82,68.15,64.88,68.1],"45":[59.34,65.17,62.53,52.98,67.85,66.05,66.34,57.86],"46":[60.65,59.54,58.89,65.03,57.2,69.42,62.04,75.4],"47":[60.49,53.32,71.74,74.84,64.25,76.4,64.5,51.61],"48":[68.88,73.46,77.24,39.69,60.24,49.64,76.67,79.19],"49":[48.97,62.8,59.55,69.49,66.98,81.31,68.05,69.43],"50":[55.55,58.33,66.01,74.03,49.12,66.94,59.49,52.9],"51":[63.81,65.98,60.05,71.07,68.65,62.84,57.61,64.46],"52":[44.7,54.7,64.55,65.33,60.66,72.13,52.53,73.07],"53":[64.75,69.82,48.82,60.5,64.09,60.41,64.3,50.45],"54":[80.71,68.83,68.08,47.79,78.92,62.57,52.3,70.02],"55":[60.9,68.76,62.46,67.05,60.47,66.44,52.3,62.49],"56":[56.76,69.18,50.29,69.9,66.39,49.1,54.46,66.18],"57":[66.12,69.23,65.27,79.28,72.42,68.95,52.01,51.65],"58":[70.78,66.92,56.09,59.16,58.39,69.84,64.33,58.4],"59":[67.02,62.3,76.85,72.34,68.64,55.37,62.43,62.94],"60":[64.54,42.93,61.55,66.39,56.5,47.25,68.61,71.98],"61":[60.15,71.78,70.85,68.6,64.55,45.89,41.34,66.95],"62":[45.21,66.73,49.17,55.28,59.95,55.22,58.91,80.15],"63":[40.55,65.13,61.45,63.06,46.24,49.51,48.01,62.49],"64":[67.13,54.4,48.79,61.9,75.53,62.75,54.47,69.23],"65":[58.25,47.34,52.05,54.78,66.15,57.83,58.87,55.32],"66":[57.96,54.53,72.47,51.57,46.26,67.72,58.75,49.21],"67":[67.18,70.71,50.6,53.89,70.36,43.52,72.25,52.04],"68":[71.96,64.64,62.43,61.59,73.51,75.75,75.44,59.81],"69":[64.56,74.41,61.66,74.47,55.99,65.29,55.15,68.33],"70":[61.7,53.53,49.51,54.72,44.77,47.99,64.73,73.53],"71":[62.32,57.83,57.99,57.06,60.54,58.59,65.54,56.32],"72":[66.14,58.24,48.11,64.01,73.64,73.36,44.33,57.95],"73":[60.84,50.48,66.8,70.46,60.94,53.43,40.41,55.59],"74":[79.56,60.97,56.4,59.15,62.83,73.39,74.36,48.28],"75":[51.64,59.84,59.1,59.15,59.77,62.19,58.13,56.01],"76":[62.42,68.49,69.4,54.96,58.36,57.85,56.91,53.58],"77":[57.58,65.45,76.47,72.92,55.46,53.1,47.01,72.44],"78":[61.11,68.76,60.76,49.53,83.58,79.07,52.07,60.97],"79":[65.01,71.03,54.84,63.36,60.47,60.8,75.39,66.77],"80":[53.21,58.98,60.85,52.81,49.91,67.35,67.51,59.17],"81":[63.25,66.75,58.16,46.59,64.96,57.29,80.84,66.41],"82":[74.49,74.96,57.54,79.77,55.39,71.43,57.92,50.47],"83":[51.31,67.39,76.52,43.8,58.11,61.36,63.31,53.9],"84":[77.75,43.79,66.83,62.54,73.69,78.56,60.43,66.0],"85":[65.34,45.77,60.96,59.54,58.13,60.57,60.89,59.6],"86":[71.25,56.88,66.8,60.58,40.05,57.95,50.87,48.86],"87":[73.34,74.37,49.95,72.85,61.83,54.61,66.1,75.63],"88":[55.7,69.53,43.21,84.56,59.75,70.91,53.99,37.85],"89":[67.13,62.16,56.31,69.55,58.11,47.01,63.8,60.55],"90":[59.15,62.34,52.91,62.54,59.14,57.21,77.3,63.8],"91":[64.87,48.63,66.13,50.94,55.49,78.4,65.39,60.09],"92":[48.68,50.76,49.95,53.62,58.81,49.6,55.3,63.49],"93":[53.31,38.87,63.36,48.99,70.59,60.66,74.49,69.59],"94":[49.45,68.99,65.99,63.16,69.41,54.83,69.67,52.12],"95":[61.37,68.0,62.65,75.36,50.58,54.78,57.65,51.36],"96":[56.81,44.83,62.75,61.87,48.93,78.71,54.52,52.73],"97":[71.54,63.02,51.16,52.37,63.23,58.15,66.94,81.73],"98":[67.58,41.14,72.84,55.67,71.15,52.9,50.92,60.56],"99":[51.9,61.89,65.03,46.69,62.48,73.33,52.76,57.48],"100":[60.8,57.45,58.42,71.67,50.27,66.2,54.21,61.7],"101":[42.9,54.75,67.23,41.96,58.86,60.1,71.99,68.46],"102":[65.64,65.95,53.11,61.61,61.19,62.44,53.91,76.52],"103":[71.05,47.6,52.06,48.59,76.93,85.83,76.81,60.49],"104":[63.41,70.38,69.38,72.96,48.98,62.17,80.83,68.58],"105":[71.21,77.02,63.06,59.5,77.04,49.17,59.0,58.64],"106":[55.04,63.4,68.43,51.94,74.06,63.5,70.7,62.56],"107":[65.6,62.6,77.3,51.43,79.02,68.33,67.7,55.16],"108":[55.23,69.81,49.11,79.25,60.6,40.44,56.69,56.59],"109":[62.68,55.58,52.52,67.47,64.69,60.83,62.89,62.34],"110":[52.96,73.13,62.15,56.05,69.12,68.15,67.82,59.86],"111":[61.0,58.7,77.52,63.73,50.76,72.87,63.53,41.69],"112":[73.1,73.29,51.22,62.71,63.75,63.79,66.16,70.16],"113":[53.51,46.75,48.02,68.45,70.11,71.83,60.95,76.7],"114":[54.89,51.69,42.16,69.55,76.94,66.12,63.71,69.12],"115":[67.2,49.24,51.0,59.17,65.53,68.69,60.23,61.66],"116":[66.74,73.79,64.21,59.02,45.78,75.83,54.38,70.73],"117":[77.39,48.72,63.57,70.74,57.72,59.71,66.68,66.95],"118":[67.49,53.75,65.37,37.3,69.2,74.82,43.13,62.66],"119":[63.28,60.68,57.68,67.03,60.6,63.26,66.09,56.9],"120":[71.01,56.88,54.31,54.96,61.66,43.53,49.1,55.66],"121":[49.02,62.4,57.06,76.3,58.84,68.13,63.94,59.43],"122":[62.93,46.24,47.12,55.5,68.45,56.53,56.66,70.57],"123":[65.16,54.09,56.95,55.92,55.82,66.47,77.66,59.84],"124":[71.64,75.91,57.5,59.34,68.16,72.47,47.53,33.38],"125":[68.7,59.72,58.04,51.03,52.56,63.54,53.96,60.63],"126":[68.56,70.2,52.89,49.76,65.97,49.96,73.16,52.8],"127":[72.8,64.06,57.54,63.72,48.75,64.21,68.3,69.67],"128":[68.6,56.77,56.24,68.17,72.37,64.31,69.5,71.92],"129":[72.17,56.33,74.83,73.27,69.05,64.23,72.07,60.01],"130":[53.75,55.3,60.32,61.14,67.98,73.06,67.39,65.94],"131":[59.68,51.47,69.98,54.12,62.87,54.98,59.77,73.58],"132":[58.25,60.84,58.66,66.67,73.64,61.79,58.21,46.42],"133":[71.54,77.88,68.66,50.37,59.21,41.6,71.95,54.86],"134":[44.1,59.82,61.05,51.43,56.67,70.32,70.87,43.14],"135":[69.12,53.8,51.17,71.82,46.66,55.73,66.81,64.85],"136":[55.07,69.59,47.6,43.21,68.6,56.57,72.26,69.07],"137":[63.74,63.82,76.53,67.88,79.51,63.76,62.52,55.19],"138":[77.72,60.74,68.81,44.5,65.96,54.27,64.08,59.06],"139":[68.22,70.63,73.65,59.86,43.56,68.88,53.73,59.23],"140":[51.26,53.22,76.55,62.08,65.23,63.54,58.24,48.17],"141":[50.71,52.59,62.5,69.32,67.75,53.89,64.8,56.41],"142":[59.35,56.56,70.42,61.7,55.2,72.39,63.51,70.7],"143":[57.9,46.59,52.57,64.07,54.66,62.44,64.34,62.02],"144":[48.65,50.37,71.25,61.06,52.16,64.53,67.34,67.08],"145":[60.87,64.45,70.08,70.14,51.62,58.71,64.5,61.54],"146":[68.55,61.1,70.16,72.85,48.94,63.0,65.81,59.03],"147":[72.45,66.48,65.08,65.34,37.17,80.2,62.3,59.55],"148":[59.37,60.22,44.81,56.36,69.98,60.92,46.9,54.51],"149":[57.83,70.27,64.18,56.7,55.7,47.77,51.54,62.19],"150":[52.47,58.97,61.17,58.32,49.83,46.26,58.59,53.08],"151":[81.99,57.89,56.07,76.18,51.28,63.3,58.76,64.7],"152":[65.1,66.04,54.52,44.91,67.4,62.11,69.0,69.45],"153":[63.79,52.83,39.63,57.41,75.62,59.87,63.28,73.58],"154":[61.73,59.74,70.24,58.5,56.47,39.81,66.35,45.5],"155":[59.89,71.93,54.63,60.37,56.01,62.38,73.42,62.52],"156":[49.81,55.43,74.34,68.24,61.52,67.1,62.87,67.42],"157":[58.01,72.84,59.15,65.51,53.76,54.73,44.16,66.36],"158":[48.78,50.34,55.55,55.44,53.87,76.71,41.73,51.62],"159":[55.63,60.83,62.15,70.14,56.96,57.2,74.12,56.31],"160":[70.79,61.92,48.2,66.1,63.9,45.59,47.84,70.81],"161":[51.67,35.13,51.41,52.62,73.47,71.82,54.8,67.09],"162":[55.2,43.03,53.02,73.89,64.12,64.62,37.64,65.58],"163":[71.74,34.57,50.66,64.75,63.9,56.67,79.3,45.1],"164":[58.48,59.69,62.58,76.75,46.45,70.42,58.94,55.58],"165":[60.46,65.36,75.95,54.97,63.76,69.17,75.61,61.41],"166":[77.73,50.06,68.0,46.97,56.06,53.13,63.69,53.21],"167":[78.17,68.23,60.45,74.35,58.78,63.71,58.88,55.69],"168":[61.35,48.72,68.12,52.4,69.99,43.87,55.75,60.37],"169":[66.29,62.42,62.15,55.74,65.99,71.36,62.74,65.15],"170":[81.06,56.59,64.59,58.73,58.81,65.11,65.66,81.16],"171":[75.55,60.08,47.37,72.77,65.7,57.95,63.21,61.93],"172":[67.78,64.8,54.91,56.13,53.77,57.87,58.29,65.98],"173":[68.93,69.84,57.86,45.76,63.59,48.55,62.73,80.25],"174":[56.07,62.26,56.05,56.87,68.11,50.48,61.59,65.73],"175":[60.01,85.61,60.7,57.43,61.95,51.1,59.47,63.51],"176":[61.04,59.8,52.95,65.15,61.17,72.41,54.27,59.43],"177":[63.51,40.94,57.09,55.49,56.94,58.74,60.65,64.84],"178":[59.73,62.27,48.92,58.11,65.27,53.28,76.85,56.61],"179":[51.49,50.57,69.17,58.61,39.08,53.4,59.75,81.47],"180":[60.27,60.4,71.42,54.35,57.75,61.62,56.9,51.08],"181":[64.27,61.16,52.71,60.96,67.54,78.05,49.65,69.15],"182":[54.1,72.05,66.26,52.39,65.81,64.9,62.3,57.3],"183":[61.56,68.76,69.23,48.69,53.91,77.09,57.37,53.78],"184":[64.0,61.85,64.4,48.66,61.9,43.72,74.27,68.35],"185":[58.4,80.87,64.5,51.3,56.06,38.03,59.77,57.21],"186":[59.41,49.42,49.13,54.19,75.29,70.86,66.4,53.96],"187":[65.35,67.08,64.15,67.07,68.3,81.93,54.53,48.55],"188":[46.7,64.44,63.38,59.4,66.32,64.7,67.99,68.37],"189":[74.18,58.54,59.77,61.51,72.79,58.2,65.87,59.03],"190":[68.88,53.33,57.79,50.09,64.79,70.45,59.82,62.47],"191":[71.07,58.75,62.55,65.45,70.69,57.6,50.37,66.06],"192":[61.59,69.17,65.09,66.58,67.53,77.23,62.57,68.92],"193":[45.66,42.44,78.74,67.55,65.79,81.4,56.17,51.73],"194":[54.41,61.22,52.35,56.35,67.9,43.3,63.43,58.22],"195":[66.19,49.47,51.0,68.58,68.79,55.84,45.9,68.57],"196":[48.67,64.29,64.93,65.78,67.73,58.08,66.88,58.49],"197":[65.67,45.81,54.11,65.43,55.64,58.2,41.43,67.81],"198":[58.27,67.48,63.57,48.48,58.61,57.67,62.75,71.5],"199":[53.5,77.94,74.11,66.93,74.05,71.95,67.76,69.98],"200":[57.66,58.7,66.04,62.4,54.98,57.02,65.54,49.76]}};
+
+const WEEKS = [1,2,3,4,5,6,7,8];
+const CH = { high:'#f85149', med:'#f0883e', low:'#3fb950', accent:'#58a6ff', gold:'#d4a72c', muted:'#8b949e', border:'#30363d', text:'#e6edf3', surface2:'#1c2333' };
+Chart.defaults.color = CH.muted;
+Chart.defaults.borderColor = CH.border;
+
+let activeFilters = new Set(['High Risk','Medium Risk','Low Risk']);
+let sortCol = 'freshman_success_index', sortDir = 1;
+let profileChart = null;
+
+function switchPage(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  el.classList.add('active');
+}
+
+function riskColor(r) {
+  if(r==='High Risk') return CH.high;
+  if(r==='Medium Risk') return CH.med;
+  return CH.low;
+}
+
+function fsiColor(v) {
+  if(v < 50) return CH.high;
+  if(v < 62) return CH.med;
+  return CH.low;
+}
+
+function gpaColor(g) {
+  if(g < 1.5) return CH.high;
+  if(g < 2.0) return CH.med;
+  return CH.low;
+}
+
+// Sparkline in canvas
+function drawSparkline(sid, color) {
+  const vals = DATA.student_trends[String(sid)] || [];
+  const c = document.createElement('canvas');
+  c.width = 80; c.height = 28;
+  const ctx = c.getContext('2d');
+  const mn = Math.min(...vals), mx = Math.max(...vals);
+  const range = mx - mn || 1;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  vals.forEach((v, i) => {
+    const x = (i / (vals.length-1)) * 78 + 1;
+    const y = 26 - ((v - mn) / range) * 24;
+    i === 0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  return c;
+}
+
+function trendChip(sid) {
+  const vals = DATA.student_trends[String(sid)];
+  if(!vals) return '';
+  const delta = vals[7] - vals[0];
+  if(delta < -10) return `<span class="trend-chip down">▼ ${Math.abs(delta).toFixed(0)}</span>`;
+  if(delta > 10) return `<span class="trend-chip up">▲ ${delta.toFixed(0)}</span>`;
+  return `<span class="trend-chip flat">~ ${delta > 0 ? '+' : ''}${delta.toFixed(0)}</span>`;
+}
+
+// ============ CONTACT TABLE ============
+function buildContactTable() {
+  applyFilters();
+}
+
+function toggleFilter(risk, btn) {
+  if(activeFilters.has(risk)) {
+    if(activeFilters.size > 1) { activeFilters.delete(risk); btn.classList.remove('high-active','med-active','low-active','active'); }
+  } else {
+    activeFilters.add(risk);
+    const cls = risk==='High Risk' ? 'high-active' : risk==='Medium Risk' ? 'med-active' : 'low-active';
+    btn.classList.add(cls);
+  }
+  applyFilters();
+}
+
+function sortTable(col) {
+  if(sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = 1; }
+  applyFilters();
+}
+
+function applyFilters() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  let rows = DATA.students_w8.filter(s =>
+    activeFilters.has(s.risk_category) &&
+    (q === '' || String(s.student_id).includes(q))
+  );
+  rows.sort((a,b) => {
+    const av = a[sortCol], bv = b[sortCol];
+    if(typeof av === 'string') return av.localeCompare(bv) * sortDir;
+    return (av - bv) * sortDir;
+  });
+  const tbody = document.getElementById('contactTbody');
+  tbody.innerHTML = '';
+  rows.forEach(s => {
+    const tr = document.createElement('tr');
+    const rClass = s.risk_category === 'High Risk' ? 'high' : s.risk_category === 'Medium Risk' ? 'med' : 'low';
+    const spark = drawSparkline(s.student_id, riskColor(s.risk_category));
+    const fsiPct = (s.freshman_success_index / 100 * 100).toFixed(0);
+    const fsiC = fsiColor(s.freshman_success_index);
+    tr.innerHTML = `
+      <td><strong>S-${String(s.student_id).padStart(3,'0')}</strong></td>
+      <td><span class="risk-badge ${rClass}">${s.risk_category}</span></td>
+      <td>
+        <div class="fsi-bar">
+          <span style="color:${fsiC};font-weight:600;width:38px;font-size:13px">${s.freshman_success_index.toFixed(1)}</span>
+          <div class="fsi-bar-track"><div class="fsi-bar-fill" style="width:${fsiPct}%;background:${fsiC}"></div></div>
+        </div>
+      </td>
+      <td style="color:${gpaColor(s.midterm_gpa)};font-weight:600">${s.midterm_gpa.toFixed(2)}</td>
+      <td style="color:${s.attendance_pct<0.7?CH.high:CH.text}">${(s.attendance_pct*100).toFixed(0)}%</td>
+      <td style="color:${s.stress_score>=8?CH.high:s.stress_score>=5?CH.med:CH.low}">${s.stress_score}/10</td>
+      <td>${s.belonging_score}/10</td>
+      <td class="sparkline-cell"></td>
+      <td>${trendChip(s.student_id)}</td>
+    `;
+    tr.querySelector('.sparkline-cell').appendChild(spark);
+    tr.style.cursor = 'pointer';
+    tr.addEventListener('click', () => openProfile(s));
+    tbody.appendChild(tr);
+  });
+  document.getElementById('result-count').textContent = `Showing ${rows.length} students`;
+}
+
+// ============ PROFILE PANEL ============
+function openProfile(s) {
+  document.getElementById('p-id').textContent = 'Student S-' + String(s.student_id).padStart(3,'0');
+  const rClass = s.risk_category === 'High Risk' ? 'high' : s.risk_category === 'Medium Risk' ? 'med' : 'low';
+  document.getElementById('p-risk-badge').innerHTML = `<span class="risk-badge ${rClass}" style="font-size:12px;padding:4px 14px">${s.risk_category}</span>`;
+  document.getElementById('p-fsi').textContent = s.freshman_success_index.toFixed(1) + ' / 100';
+  document.getElementById('p-fsi').style.color = fsiColor(s.freshman_success_index);
+  document.getElementById('p-gpa').textContent = s.midterm_gpa.toFixed(2);
+  document.getElementById('p-gpa').style.color = gpaColor(s.midterm_gpa);
+  document.getElementById('p-attend').textContent = (s.attendance_pct*100).toFixed(0) + '%';
+  document.getElementById('p-assign').textContent = (s.assignments_completed_pct*100).toFixed(0) + '%';
+  document.getElementById('p-study').textContent = s.study_hours + ' hrs';
+  document.getElementById('p-lms').textContent = s.lms_logins + ' logins';
+  document.getElementById('p-stress').style.color = s.stress_score >= 8 ? CH.high : s.stress_score >= 5 ? CH.med : CH.low;
+  document.getElementById('p-stress').textContent = s.stress_score + '/10';
+  document.getElementById('p-belong').textContent = s.belonging_score + '/10';
+  document.getElementById('p-tutor').textContent = s.tutoring_visits;
+  document.getElementById('p-office').textContent = s.office_hour_visits;
+
+  // Trend chart
+  const trendData = DATA.student_trends[String(s.student_id)] || [];
+  if(profileChart) profileChart.destroy();
+  const ctx = document.getElementById('profileTrendChart').getContext('2d');
+  profileChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['Wk1','Wk2','Wk3','Wk4','Wk5','Wk6','Wk7','Wk8'],
+      datasets: [{
+        data: trendData, borderColor: riskColor(s.risk_category), backgroundColor: riskColor(s.risk_category) + '20',
+        tension: 0.4, fill: true, pointRadius: 3, pointBackgroundColor: riskColor(s.risk_category)
+      }]
+    },
+    options: { plugins:{legend:{display:false}}, scales:{ x:{grid:{color:CH.border+'80'}}, y:{min:20,max:100,grid:{color:CH.border+'80'}} }, responsive:true, maintainAspectRatio:false }
+  });
+
+  // Percentiles
+  const allFSI = DATA.students_w8.map(x => x.freshman_success_index).sort((a,b)=>a-b);
+  const allGPA = DATA.students_w8.map(x => x.midterm_gpa).sort((a,b)=>a-b);
+  const allAtt = DATA.students_w8.map(x => x.attendance_pct).sort((a,b)=>a-b);
+  function pct(arr, val) { return Math.round(arr.filter(v=>v<=val).length / arr.length * 100); }
+
+  document.getElementById('p-percentiles').innerHTML = [
+    ['FSI Percentile', pct(allFSI, s.freshman_success_index), fsiColor(s.freshman_success_index)],
+    ['GPA Percentile', pct(allGPA, s.midterm_gpa), gpaColor(s.midterm_gpa)],
+    ['Attendance Percentile', pct(allAtt, s.attendance_pct), s.attendance_pct < 0.7 ? CH.high : CH.accent],
+  ].map(([label, p, col]) => `
+    <div class="perc-bar">
+      <div class="perc-label-row"><span>${label}</span><span style="color:${col}">${p}th</span></div>
+      <div class="perc-track"><div class="perc-fill" style="width:${p}%;background:${col}"></div></div>
+    </div>
+  `).join('');
+
+  // Actions
+  const actions = [];
+  if(s.risk_category === 'High Risk') actions.push('<button class="action-btn action-primary" onclick="alert(\'Contact initiated for S-' + s.student_id + '\')">📞 Schedule Outreach Call</button>');
+  if(s.stress_score >= 7) actions.push('<button class="action-btn action-secondary">🧘 Refer to Counseling Services</button>');
+  if(s.tutoring_visits === 0) actions.push('<button class="action-btn action-secondary">📚 Enroll in Tutoring Program</button>');
+  if(s.belonging_score <= 3) actions.push('<button class="action-btn action-secondary">🤝 Connect to Student Groups</button>');
+  if(s.attendance_pct < 0.7) actions.push('<button class="action-btn action-secondary">📋 Attendance Intervention</button>');
+  document.getElementById('p-actions').innerHTML = actions.join('') || '<p style="color:var(--muted);font-size:12px">No urgent actions needed.</p>';
+
+  document.getElementById('profilePanel').style.display = 'block';
+  document.getElementById('profilePanel').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+}
+
+function closeProfile() {
+  document.getElementById('profilePanel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+  setTimeout(() => document.getElementById('profilePanel').style.display = 'none', 250);
+}
+
+// ============ CHARTS ============
+function buildCharts() {
+  // 1. FSI Histogram
+  const buckets = Array(14).fill(0);
+  DATA.students_w8.forEach(s => { const b = Math.min(Math.floor((s.freshman_success_index-20)/5), 13); buckets[Math.max(0,b)]++; });
+  const bucketLabels = Array.from({length:14}, (_,i) => `${20+i*5}-${25+i*5}`);
+  const bucketColors = buckets.map((_,i) => { const mid = 22.5 + i*5; return mid < 50 ? CH.high : mid < 62 ? CH.med : CH.low; });
+  new Chart(document.getElementById('histChart').getContext('2d'), {
+    type:'bar', data:{ labels:bucketLabels, datasets:[{data:buckets, backgroundColor:bucketColors, borderRadius:4}] },
+    options:{ plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{grid:{color:CH.border+'80'}, beginAtZero:true}}, responsive:true, maintainAspectRatio:false }
+  });
+
+  // 2. Donut
+  new Chart(document.getElementById('donutChart').getContext('2d'), {
+    type:'doughnut',
+    data:{ labels:['High Risk','Medium Risk','Low Risk'], datasets:[{data:[67,62,71], backgroundColor:[CH.high,CH.med,CH.low], borderWidth:0, hoverOffset:6}] },
+    options:{ plugins:{legend:{display:false}}, cutout:'72%', responsive:true, maintainAspectRatio:false }
+  });
+
+  // 3. GPA vs Retention
+  const gpaBuckets = ['<1.0','1.0-1.5','1.5-2.0','2.0-2.5','2.5-3.0','3.0+'];
+  const gpaCounts = [0,0,0,0,0,0], gpaRetained = [0,0,0,0,0,0];
+  DATA.students_w8.forEach(s => {
+    const g = s.midterm_gpa, ret = s.retained_next_semester;
+    const i = g<1?0:g<1.5?1:g<2?2:g<2.5?3:g<3?4:5;
+    gpaCounts[i]++; gpaRetained[i] += ret;
+  });
+  const retRate = gpaCounts.map((c,i) => c ? (gpaRetained[i]/c*100).toFixed(0)*1 : 0);
+  new Chart(document.getElementById('gpaRetentionChart').getContext('2d'), {
+    type:'bar', data:{ labels:gpaBuckets, datasets:[{label:'Retention %',data:retRate,backgroundColor:[CH.high,CH.high,CH.med,CH.accent,CH.low,CH.low],borderRadius:4}] },
+    options:{ plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{min:0,max:100,grid:{color:CH.border+'80'}, ticks:{callback:v=>v+'%'}}}, responsive:true, maintainAspectRatio:false }
+  });
+
+  // 4. Stress chart (stacked by risk)
+  const stressBins = [0,0,0,0,0,0,0,0,0,0]; // 1-10
+  const stressHigh = Array(10).fill(0), stressMed = Array(10).fill(0), stressLow = Array(10).fill(0);
+  DATA.students_w8.forEach(s => {
+    const idx = s.stress_score - 1;
+    if(s.risk_category==='High Risk') stressHigh[idx]++;
+    else if(s.risk_category==='Medium Risk') stressMed[idx]++;
+    else stressLow[idx]++;
+  });
+  new Chart(document.getElementById('stressChart').getContext('2d'), {
+    type:'bar',
+    data:{ labels:['1','2','3','4','5','6','7','8','9','10'],
+      datasets:[
+        {label:'High Risk',data:stressHigh,backgroundColor:CH.high+'bb',borderRadius:2},
+        {label:'Med Risk',data:stressMed,backgroundColor:CH.med+'bb',borderRadius:2},
+        {label:'Low Risk',data:stressLow,backgroundColor:CH.low+'bb',borderRadius:2}
+      ]},
+    options:{ plugins:{legend:{display:true,position:'top',labels:{boxWidth:10,font:{size:10}}}}, scales:{x:{stacked:true,grid:{display:false}}, y:{stacked:true,grid:{color:CH.border+'80'}}}, responsive:true, maintainAspectRatio:false }
+  });
+
+  // 5. Predictor chart
+  const predictors = ['Midterm GPA','FSI Score','Belonging','Study Hrs','Attendance','LMS Logins','Stress (neg)'];
+  const corrs = [0.71, 0.44, 0.12, 0.07, 0.06, 0.04, -0.27];
+  const pColors = corrs.map(v => v < 0 ? CH.high : CH.accent);
+  new Chart(document.getElementById('predictorChart').getContext('2d'), {
+    type:'bar',
+    data:{ labels:predictors, datasets:[{data:corrs.map(Math.abs), backgroundColor:pColors, borderRadius:4}] },
+    options:{ indexAxis:'y', plugins:{legend:{display:false}}, scales:{x:{max:1, grid:{color:CH.border+'80'}}, y:{grid:{display:false}}}, responsive:true, maintainAspectRatio:false }
+  });
+
+  // 6. FSI trend
+  new Chart(document.getElementById('fsiTrendChart').getContext('2d'), {
+    type:'line',
+    data:{ labels:WEEKS.map(w=>'Week '+w), datasets:[{label:'Avg FSI',data:DATA.weekly.map(w=>w.avg_fsi),borderColor:CH.accent,backgroundColor:CH.accent+'20',tension:0.4,fill:true,pointRadius:4,pointBackgroundColor:CH.accent}] },
+    options:{ plugins:{legend:{display:false}}, scales:{x:{grid:{color:CH.border+'80'}}, y:{min:58,max:65,grid:{color:CH.border+'80'}}}, responsive:true, maintainAspectRatio:false }
+  });
+
+  // 7. High risk trend
+  new Chart(document.getElementById('highRiskTrendChart').getContext('2d'), {
+    type:'bar',
+    data:{ labels:WEEKS.map(w=>'Week '+w), datasets:[{data:DATA.weekly.map(w=>w.high_risk_count), backgroundColor:DATA.weekly.map(w=>w.high_risk_count>=70?CH.high:CH.med), borderRadius:4}] },
+    options:{ plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{min:50,max:80, grid:{color:CH.border+'80'}}}, responsive:true, maintainAspectRatio:false }
+  });
+
+  // 8. GPA trend
+  new Chart(document.getElementById('gpaTrendChart').getContext('2d'), {
+    type:'line',
+    data:{ labels:WEEKS.map(w=>'Week '+w), datasets:[{label:'Avg GPA',data:DATA.weekly.map(w=>w.avg_gpa),borderColor:CH.gold,backgroundColor:CH.gold+'20',tension:0.4,fill:true,pointRadius:4,pointBackgroundColor:CH.gold}] },
+    options:{ plugins:{legend:{display:false}}, scales:{x:{grid:{color:CH.border+'80'}}, y:{min:1.9,max:2.4, grid:{color:CH.border+'80'}}}, responsive:true, maintainAspectRatio:false }
+  });
+
+  // 9. Wellbeing stress vs belonging
+  new Chart(document.getElementById('wellbeingChart').getContext('2d'), {
+    type:'line',
+    data:{ labels:WEEKS.map(w=>'Week '+w), datasets:[
+      {label:'Avg Stress',data:DATA.weekly.map(w=>w.avg_stress),borderColor:CH.high,backgroundColor:'transparent',tension:0.4,pointRadius:3},
+      {label:'Avg Belonging',data:DATA.weekly.map(w=>w.avg_belonging),borderColor:CH.low,backgroundColor:'transparent',tension:0.4,pointRadius:3}
+    ] },
+    options:{ plugins:{legend:{display:true,position:'top',labels:{boxWidth:10,font:{size:10}}}}, scales:{x:{grid:{color:CH.border+'80'}}, y:{min:4.5,max:6.5,grid:{color:CH.border+'80'}}}, responsive:true, maintainAspectRatio:false }
+  });
+
+  // 10. Decline chart
+  const declines = DATA.students_w8.map(s => {
+    const t = DATA.student_trends[String(s.student_id)];
+    return { id: s.student_id, risk: s.risk_category, drop: t ? t[0] - t[7] : 0 };
+  }).sort((a,b) => b.drop - a.drop).slice(0,15);
+  new Chart(document.getElementById('declineChart').getContext('2d'), {
+    type:'bar',
+    data:{ labels: declines.map(d=>'S-'+String(d.id).padStart(3,'0')), datasets:[{label:'FSI Drop (W1→W8)',data:declines.map(d=>d.drop.toFixed(1)*1),backgroundColor:declines.map(d=>riskColor(d.risk)),borderRadius:4}] },
+    options:{ plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{grid:{color:CH.border+'80'},beginAtZero:true}}, responsive:true, maintainAspectRatio:false }
+  });
+
+  // 11. Scatter FSI vs GPA
+  const scatterDatasets = ['High Risk','Medium Risk','Low Risk'].map(risk => ({
+    label: risk,
+    data: DATA.students_w8.filter(s=>s.risk_category===risk).map(s=>({x:s.freshman_success_index, y:s.midterm_gpa, sid:s.student_id})),
+    backgroundColor: riskColor(risk) + 'bb', pointRadius: 5, pointHoverRadius: 8
+  }));
+  const scatterChart = new Chart(document.getElementById('scatterChart').getContext('2d'), {
+    type:'scatter',
+    data:{ datasets: scatterDatasets },
+    options:{
+      plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label: ctx => `S-${String(ctx.raw.sid).padStart(3,'0')} | FSI:${ctx.raw.x.toFixed(1)} GPA:${ctx.raw.y.toFixed(2)}` } } },
+      scales:{ x:{title:{display:true,text:'Freshman Success Index'},min:20,max:90,grid:{color:CH.border+'80'}}, y:{title:{display:true,text:'Midterm GPA'},min:0,max:4.1,grid:{color:CH.border+'80'}} },
+      responsive:true, maintainAspectRatio:false,
+      onClick: (e, elements) => {
+        if(elements.length > 0) {
+          const el = elements[0];
+          const ds = scatterDatasets[el.datasetIndex];
+          const pt = ds.data[el.index];
+          const s = DATA.students_w8.find(x => x.student_id === pt.sid);
+          if(s) openProfile(s);
+        }
+      }
+    }
+  });
+
+  // 12. Attendance vs retention
+  const attBuckets = ['<60%','60-70%','70-80%','80-90%','90-100%'];
+  const attCounts = [0,0,0,0,0], attRet = [0,0,0,0,0];
+  DATA.students_w8.forEach(s => {
+    const a = s.attendance_pct, ret = s.retained_next_semester;
+    const i = a<0.6?0:a<0.7?1:a<0.8?2:a<0.9?3:4;
+    attCounts[i]++; attRet[i] += ret;
+  });
+  new Chart(document.getElementById('attendRetChart').getContext('2d'), {
+    type:'bar',
+    data:{ labels:attBuckets, datasets:[{label:'Retention Rate',data:attCounts.map((c,i)=>c?(attRet[i]/c*100).toFixed(0)*1:0),backgroundColor:[CH.high,CH.high+'aa',CH.med,CH.low+'aa',CH.low],borderRadius:4}] },
+    options:{ plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{max:100,grid:{color:CH.border+'80'},ticks:{callback:v=>v+'%'}}}, responsive:true, maintainAspectRatio:false }
+  });
+
+  // 13. Support usage
+  const byRisk = {
+    'High Risk': DATA.students_w8.filter(s=>s.risk_category==='High Risk'),
+    'Medium Risk': DATA.students_w8.filter(s=>s.risk_category==='Medium Risk'),
+    'Low Risk': DATA.students_w8.filter(s=>s.risk_category==='Low Risk'),
+  };
+  const avgTutor = Object.values(byRisk).map(g => (g.reduce((a,s)=>a+s.tutoring_visits,0)/g.length).toFixed(2)*1);
+  const avgOffice = Object.values(byRisk).map(g => (g.reduce((a,s)=>a+s.office_hour_visits,0)/g.length).toFixed(2)*1);
+  new Chart(document.getElementById('supportChart').getContext('2d'), {
+    type:'bar',
+    data:{ labels:['High Risk','Med Risk','Low Risk'],
+      datasets:[{label:'Tutoring',data:avgTutor,backgroundColor:CH.accent+'bb',borderRadius:3},{label:'Office Hrs',data:avgOffice,backgroundColor:CH.gold+'bb',borderRadius:3}]
+    },
+    options:{ plugins:{legend:{display:true,position:'top',labels:{boxWidth:10,font:{size:10}}}}, scales:{x:{grid:{display:false}}, y:{beginAtZero:true,grid:{color:CH.border+'80'}}}, responsive:true, maintainAspectRatio:false }
+  });
+
+  // 14-16. LMS / Study / Assign
+  const lmsAvg = Object.values(byRisk).map(g => (g.reduce((a,s)=>a+s.lms_logins,0)/g.length).toFixed(1)*1);
+  const studyAvg = Object.values(byRisk).map(g => (g.reduce((a,s)=>a+s.study_hours,0)/g.length).toFixed(1)*1);
+  const assignAvg = Object.values(byRisk).map(g => (g.reduce((a,s)=>a+s.assignments_completed_pct,0)/g.length*100).toFixed(1)*1);
+  ['lmsChart','studyChart','assignChart'].forEach((id, ci) => {
+    const vals = [lmsAvg, studyAvg, assignAvg][ci];
+    new Chart(document.getElementById(id).getContext('2d'), {
+      type:'bar',
+      data:{ labels:['High Risk','Med Risk','Low Risk'], datasets:[{data:vals,backgroundColor:[CH.high,CH.med,CH.low],borderRadius:4}] },
+      options:{ plugins:{legend:{display:false}}, scales:{x:{grid:{display:false}}, y:{beginAtZero:true,grid:{color:CH.border+'80'}}}, responsive:true, maintainAspectRatio:false }
+    });
+  });
+}
+
+// ============ INIT ============
+buildContactTable();
+buildCharts();
+</script>
+</body>
+</html>
