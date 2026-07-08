@@ -17,7 +17,7 @@ Every semester, colleges enroll hundreds of new freshmen — and a significant p
 
 ## 🖥️ Live Demo
 
-> *(Add your Render/Railway deployment URL here after deploying)*
+>  🚀 [Live Demo](https://freshman-success-platform.onrender.com)
 
 ---
 
@@ -145,7 +145,7 @@ The app opens automatically at **http://localhost:8000**
 
 ## 👤 Author
 
-Built by **[Your Name]** · [LinkedIn](https://linkedin.com) · [Portfolio](https://yoursite.com)
+Built by Bhagwant Negi · [LinkedIn][(https://www.linkedin.com/in/bhagwant-negi/) · 
 
 ---
 
